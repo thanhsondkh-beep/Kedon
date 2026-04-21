@@ -406,26 +406,29 @@ var BENH_DB  = ["Viêm phổi", "Tắc nghẽn phổi mãn tính", "Viêm loét 
 document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("inpDate").value = new Date().toISOString().split("T")[0];
 
-  // ── Thử load từ localStorage trước (hiển thị ngay, không chờ mạng) ──
+  // ── Load từ localStorage trước (hiển thị ngay, không chờ mạng) ──
   try {
-    var saved = localStorage.getItem("bvhh_drug_db");
-    if (saved) {
-      var parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        DRUG_DB = parsed;
-      }
-    }
+    var sd = localStorage.getItem("bvhh_drug_db");
+    if (sd) { var p = JSON.parse(sd); if (Array.isArray(p) && p.length) DRUG_DB = p; }
+    var sb = localStorage.getItem("bvhh_bacsi_db");
+    if (sb) { var p2 = JSON.parse(sb); if (Array.isArray(p2) && p2.length) BACSI_DB = p2; }
+    var sl = localStorage.getItem("bvhh_loidan_db");
+    if (sl) { var p3 = JSON.parse(sl); if (Array.isArray(p3) && p3.length) LOIDAN_DB = p3; }
+    var sbn = localStorage.getItem("bvhh_benh_db");
+    if (sbn) { var p4 = JSON.parse(sbn); if (Array.isArray(p4) && p4.length) BENH_DB = p4; }
   } catch(e) {}
 
-  // Render ngay với dữ liệu local (không chờ)
+  // Render ngay với dữ liệu local
   renderDrugList(DRUG_DB);
   populateBacsi(BACSI_DB);
   populateLoidan(LOIDAN_DB);
   addDrugRow();
 
-  // ── Sau đó load từ Firestore (cập nhật nếu có thay đổi từ máy khác) ──
+  // ── Sau đó load từ Firestore (đồng bộ từ máy khác) ──
   loadFromFirestore(function() {
     renderDrugList(DRUG_DB);
+    populateBacsi(BACSI_DB);
+    populateLoidan(LOIDAN_DB);
   });
 
   // Sync header live
@@ -710,6 +713,7 @@ document.addEventListener("DOMContentLoaded", function() {
     var sdt = document.getElementById("mgBsSdt").value.trim();
     BACSI_DB.push({ten:name, sdt:sdt});
     populateBacsi(BACSI_DB); renderMgBacsi();
+    saveDB();
     document.getElementById("mgBsName").value=""; document.getElementById("mgBsSdt").value="";
     document.getElementById("mgBsName").focus();
     showToast("✓ Đã thêm bác sĩ: "+name);
@@ -721,6 +725,7 @@ document.addEventListener("DOMContentLoaded", function() {
     var v = document.getElementById("mgLdText").value.trim();
     if (!v) return;
     LOIDAN_DB.push(v); populateLoidan(LOIDAN_DB); renderMgLoidan();
+    saveDB();
     document.getElementById("mgLdText").value=""; document.getElementById("mgLdText").focus();
     showToast("✓ Đã thêm lời dặn");
   });
@@ -730,6 +735,7 @@ document.addEventListener("DOMContentLoaded", function() {
     var v = document.getElementById("mgBenhText").value.trim();
     if (!v) return;
     BENH_DB.push(v); renderMgBenh();
+    saveDB();
     document.getElementById("mgBenhText").value=""; document.getElementById("mgBenhText").focus();
     showToast("✓ Đã thêm bệnh: "+v);
   });
@@ -782,7 +788,7 @@ function renderMgBacsi() {
     var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
     btn.addEventListener("click", function(){
       if(!confirm("Xóa bác sĩ: "+b.ten+"?")) return;
-      BACSI_DB.splice(i,1); populateBacsi(BACSI_DB); renderMgBacsi();
+      BACSI_DB.splice(i,1); populateBacsi(BACSI_DB); renderMgBacsi(); saveDB();
     });
     row.appendChild(btn); list.appendChild(row);
   });
@@ -796,7 +802,7 @@ function renderMgLoidan() {
     var sp = document.createElement("span"); sp.textContent = ld; sp.style.fontSize="12px";
     var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
     btn.addEventListener("click", function(){
-      LOIDAN_DB.splice(i,1); populateLoidan(LOIDAN_DB); renderMgLoidan();
+      LOIDAN_DB.splice(i,1); populateLoidan(LOIDAN_DB); renderMgLoidan(); saveDB();
     });
     row.appendChild(sp); row.appendChild(btn); list.appendChild(row);
   });
@@ -810,7 +816,7 @@ function renderMgBenh() {
     var sp = document.createElement("span"); sp.textContent = b;
     var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
     btn.addEventListener("click", function(){
-      BENH_DB.splice(i,1); renderMgBenh();
+      BENH_DB.splice(i,1); renderMgBenh(); saveDB();
       showToast("Đã xóa: "+b);
     });
     row.appendChild(sp); row.appendChild(btn); list.appendChild(row);
@@ -856,13 +862,18 @@ var DRUG_COLLECTION = "drug_catalog";
 var META_DOC = "meta";
 
 // ══════════════════════════════════════════════
-// LƯU / KHÔI PHỤC DRUG_DB
+// LƯU / KHÔI PHỤC TOÀN BỘ DANH MỤC
 // ══════════════════════════════════════════════
 var saveTimeout = null;
 function saveDB() {
   // Lưu localStorage ngay lập tức (cache offline)
-  try { localStorage.setItem("bvhh_drug_db", JSON.stringify(DRUG_DB)); } catch(e) {}
-  // Lưu Firestore debounce 800ms (tránh ghi quá nhiều)
+  try {
+    localStorage.setItem("bvhh_drug_db",   JSON.stringify(DRUG_DB));
+    localStorage.setItem("bvhh_bacsi_db",  JSON.stringify(BACSI_DB));
+    localStorage.setItem("bvhh_loidan_db", JSON.stringify(LOIDAN_DB));
+    localStorage.setItem("bvhh_benh_db",   JSON.stringify(BENH_DB));
+  } catch(e) {}
+  // Lưu Firestore debounce 800ms
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(function() { saveToFirestore(); }, 800);
 }
@@ -884,22 +895,39 @@ function setSyncStatus(state, msg) {
 
 function saveToFirestore() {
   setSyncStatus("syncing", "🔄 Đang đồng bộ...");
-  // Lưu toàn bộ DRUG_DB vào 1 document duy nhất
-  db.collection(DRUG_COLLECTION).doc(META_DOC).set({ drugs: DRUG_DB, updatedAt: Date.now() })
-    .then(function() { setSyncStatus("ok", "✅ Đã đồng bộ lên cloud"); })
-    .catch(function(err) { setSyncStatus("error", "⚠ Lỗi đồng bộ: " + err.message); });
+  db.collection(DRUG_COLLECTION).doc(META_DOC).set({
+    drugs:   DRUG_DB,
+    bacsi:   BACSI_DB,
+    loidan:  LOIDAN_DB,
+    benh:    BENH_DB,
+    updatedAt: Date.now()
+  })
+  .then(function() { setSyncStatus("ok", "✅ Đã đồng bộ lên cloud"); })
+  .catch(function(err) { setSyncStatus("error", "⚠ Lỗi đồng bộ: " + err.message); });
 }
 
 function loadFromFirestore(callback) {
   setSyncStatus("syncing", "🔄 Đang tải dữ liệu từ cloud...");
   db.collection(DRUG_COLLECTION).doc(META_DOC).get()
     .then(function(doc) {
-      if (doc.exists && doc.data().drugs && doc.data().drugs.length > 0) {
-        DRUG_DB = doc.data().drugs;
-        try { localStorage.setItem("bvhh_drug_db", JSON.stringify(DRUG_DB)); } catch(e) {}
-        setSyncStatus("ok", "✅ Đã tải " + DRUG_DB.length + " thuốc từ cloud");
+      if (doc.exists) {
+        var data = doc.data();
+        if (data.drugs  && data.drugs.length  > 0) DRUG_DB   = data.drugs;
+        if (data.bacsi  && data.bacsi.length  > 0) BACSI_DB  = data.bacsi;
+        if (data.loidan && data.loidan.length > 0) LOIDAN_DB = data.loidan;
+        if (data.benh   && data.benh.length   > 0) BENH_DB   = data.benh;
+        // Cập nhật cache localStorage
+        try {
+          localStorage.setItem("bvhh_drug_db",   JSON.stringify(DRUG_DB));
+          localStorage.setItem("bvhh_bacsi_db",  JSON.stringify(BACSI_DB));
+          localStorage.setItem("bvhh_loidan_db", JSON.stringify(LOIDAN_DB));
+          localStorage.setItem("bvhh_benh_db",   JSON.stringify(BENH_DB));
+        } catch(e) {}
+        setSyncStatus("ok", "✅ Đã tải dữ liệu từ cloud");
+        if (!doc.data().drugs || !doc.data().drugs.length) {
+          saveToFirestore(); // Lần đầu: đẩy data mặc định lên
+        }
       } else {
-        // Chưa có data trên cloud → đẩy dữ liệu hiện tại lên
         setSyncStatus("syncing", "🔄 Khởi tạo dữ liệu lên cloud...");
         saveToFirestore();
       }
