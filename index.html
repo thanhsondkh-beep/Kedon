@@ -1411,7 +1411,8 @@ function getDrugRows(){
 
 // ══════════════════════════════════════════════
 // ══════════════════════════════════════════════
-// BUILD HTML ĐƠN THUỐC — A5 NGANG
+// ══════════════════════════════════════════════
+// BUILD HTML ĐƠN THUỐC — A4 ĐỨNG
 // ══════════════════════════════════════════════
 function buildRx(){
   var rows=getDrugRows();
@@ -1421,63 +1422,57 @@ function buildRx(){
   var dateStr=fmtDate(gv("inpDate"));
   var drugRows=rows.map(function(r){
     return "<tr>"+
-      "<td style='padding:3px 4px;border:1px solid #bbb;text-align:center;width:20px;'>"+r.stt+"</td>"+
-      "<td style='padding:3px 5px;border:1px solid #bbb;'>"+r.name+"</td>"+
-      "<td style='padding:3px 4px;border:1px solid #bbb;text-align:center;width:36px;'>"+r.dvt+"</td>"+
-      "<td style='padding:3px 4px;border:1px solid #bbb;text-align:center;width:28px;'>"+r.sl+"</td>"+
-      "<td style='padding:3px 5px;border:1px solid #bbb;'>"+r.usage+"</td></tr>";
+      "<td style='padding:5px 6px;border:1px solid #bbb;text-align:center;'>"+r.stt+"</td>"+
+      "<td style='padding:5px 7px;border:1px solid #bbb;'>"+r.name+"</td>"+
+      "<td style='padding:5px 6px;border:1px solid #bbb;text-align:center;'>"+r.dvt+"</td>"+
+      "<td style='padding:5px 6px;border:1px solid #bbb;text-align:center;'>"+r.sl+"</td>"+
+      "<td style='padding:5px 7px;border:1px solid #bbb;'>"+r.usage+"</td></tr>";
   }).join("");
-  if(!drugRows) drugRows="<tr><td colspan='5' style='padding:6px;text-align:center;color:#aaa;border:1px solid #bbb;'>Chưa có thuốc</td></tr>";
+  if(!drugRows) drugRows="<tr><td colspan='5' style='padding:10px;text-align:center;color:#aaa;border:1px solid #bbb;'>Chưa có thuốc</td></tr>";
   var hosp=gv("inpHospital")||"BỆNH VIỆN ĐA KHOA HẢI HẬU";
   var addr=gv("inpAddress")||"Số 236 thôn 3 Yên Định, Xã Hải Hậu, tỉnh Ninh Bình";
   var gender=gv("inpGender");
-  return "<div style='font-family:Times New Roman,serif;font-size:12px;color:#000;width:100%;'>"+
-    // Header: tên BV trái, ĐƠN THUỐC giữa
-    "<table style='width:100%;border-collapse:collapse;margin-bottom:3px;'><tr>"+
-    "<td style='width:42%;vertical-align:top;font-size:10px;line-height:1.5;'><b>"+hosp+"</b><br>"+addr+(gv("inpTel")?"<br>ĐT: "+gv("inpTel"):"")+"</td>"+
-    "<td style='text-align:center;vertical-align:middle;padding:0 8px;'><div style='font-size:17px;font-weight:700;letter-spacing:2px;'>ĐƠN THUỐC</div></td>"+
-    "<td style='width:22%;'></td></tr></table>"+
-    "<hr style='border:none;border-top:1px solid #999;margin:3px 0;'>"+
-    // Thông tin BN — 2 cột
-    "<table style='width:100%;border-collapse:collapse;margin-bottom:3px;font-size:12px;'><tr>"+
-    "<td style='width:55%;padding-right:8px;vertical-align:top;'>"+
-      "<div style='margin-bottom:2px;'><b>Họ tên:</b> "+(gv("inpName")||".............................................")+"</div>"+
-      "<div style='margin-bottom:2px;display:flex;gap:12px;'>"+
-        "<span><b>Ngày sinh:</b> "+dobStr+ageExtra+"</span>"+
-        "<span><b>Giới tính:</b> "+(gender||"□ Nam □ Nữ")+"</span>"+
-        (gv("inpWeight")?"<span><b>Cân nặng:</b> "+gv("inpWeight")+" kg</span>":"")+
-      "</div>"+
-      (gv("inpAddr")?"<div style='margin-bottom:2px;'><b>Địa chỉ:</b> "+gv("inpAddr")+"</div>":"")+
-    "</td>"+
-    "<td style='width:45%;vertical-align:top;'>"+
-      (gv("inpID")?"<div style='margin-bottom:2px;'><b>Số định danh/CCCD:</b> "+gv("inpID")+"</div>":"")+
-      (gv("inpBHYT")?"<div style='margin-bottom:2px;'><b>Mã BHYT:</b> "+gv("inpBHYT")+"</div>":"")+
-      "<div style='margin-bottom:2px;'><b>Chẩn đoán:</b> "+(gv("inpDx")||".............................................")+"</div>"+
-    "</td></tr></table>"+
+  return "<div style='font-family:Times New Roman,serif;font-size:14px;color:#000;width:100%;'>"+
+    // Header
+    "<div style='font-size:13px;font-weight:700;text-transform:uppercase;text-align:left;margin-bottom:3px;'>"+hosp+"</div>"+
+    "<div style='font-size:12px;text-align:left;margin-bottom:2px;'>"+addr+(gv("inpTel")?" — ĐT: "+gv("inpTel"):"")+"</div>"+
+    "<hr style='border:none;border-top:1.5px solid #000;margin:6px 0;'>"+
+    "<div style='text-align:center;font-size:22px;font-weight:700;letter-spacing:3px;margin:8px 0 4px;'>ĐƠN THUỐC</div>"+
+    "<hr style='border:none;border-top:1px solid #999;margin:4px 0 10px;'>"+
+    // Thông tin bệnh nhân
+    "<div style='margin-bottom:5px;font-size:14px;'><b>Họ và tên:</b> "+(gv("inpName")||".....................................................................")+"</div>"+
+    "<div style='display:flex;gap:30px;margin-bottom:5px;font-size:14px;'>"+
+      "<span><b>Ngày sinh:</b> "+dobStr+ageExtra+"</span>"+
+      "<span><b>Giới tính:</b> "+(gender||"□ Nam &nbsp; □ Nữ")+"</span>"+
+      (gv("inpWeight")?"<span><b>Cân nặng:</b> "+gv("inpWeight")+" kg</span>":"")+
+    "</div>"+
+    (gv("inpID")?"<div style='margin-bottom:5px;font-size:14px;'><b>Số định danh/CCCD:</b> "+gv("inpID")+"</div>":"")+
+    (gv("inpBHYT")?"<div style='margin-bottom:5px;font-size:14px;'><b>Mã số BHYT:</b> "+gv("inpBHYT")+"</div>":"")+
+    (gv("inpAddr")?"<div style='margin-bottom:5px;font-size:14px;'><b>Địa chỉ:</b> "+gv("inpAddr")+"</div>":"")+
+    "<div style='margin-bottom:10px;font-size:14px;'><b>Chẩn đoán:</b> "+(gv("inpDx")||".....................................................................")+"</div>"+
     // Bảng thuốc
-    "<div style='font-weight:700;font-size:11px;margin-bottom:2px;'>Thuốc điều trị:</div>"+
-    "<table style='width:100%;border-collapse:collapse;font-size:11px;'>"+
+    "<div style='font-weight:700;font-size:14px;margin-bottom:5px;'>Thuốc điều trị:</div>"+
+    "<table style='width:100%;border-collapse:collapse;font-size:13px;'>"+
     "<thead><tr style='background:#1a5fa8;color:#fff;'>"+
-    "<th style='padding:3px;border:1px solid #1a5fa8;width:20px;text-align:center;'>STT</th>"+
-    "<th style='padding:3px 5px;border:1px solid #1a5fa8;text-align:left;'>Tên thuốc</th>"+
-    "<th style='padding:3px;border:1px solid #1a5fa8;width:36px;text-align:center;'>ĐVT</th>"+
-    "<th style='padding:3px;border:1px solid #1a5fa8;width:28px;text-align:center;'>SL</th>"+
-    "<th style='padding:3px 5px;border:1px solid #1a5fa8;text-align:left;'>Cách dùng</th>"+
+    "<th style='padding:6px 5px;border:1px solid #1a5fa8;width:36px;text-align:center;'>STT</th>"+
+    "<th style='padding:6px 8px;border:1px solid #1a5fa8;text-align:left;'>Tên thuốc</th>"+
+    "<th style='padding:6px 5px;border:1px solid #1a5fa8;width:52px;text-align:center;'>ĐVT</th>"+
+    "<th style='padding:6px 5px;border:1px solid #1a5fa8;width:44px;text-align:center;'>SL</th>"+
+    "<th style='padding:6px 8px;border:1px solid #1a5fa8;text-align:left;'>Cách dùng</th>"+
     "</tr></thead><tbody>"+drugRows+"</tbody></table>"+
-    // Lời dặn + ký tên — 2 cột
-    "<table style='width:100%;border-collapse:collapse;margin-top:5px;'><tr>"+
-    "<td style='width:62%;vertical-align:top;padding-right:10px;'>"+
-      (gv("inpNote")?"<div style='font-size:11px;'><b>Lời dặn:</b> "+gv("inpNote")+"</div>":"")+
-      "<div style='font-style:italic;font-size:10px;margin-top:3px;'>- Khám bệnh lại xin mang theo đơn này.</div>"+
-      (gv("inpPhone")?"<div style='font-size:10px;'>- SĐT liên hệ: "+gv("inpPhone")+"</div>":"")+
-      (gv("inpGuardian")?"<div style='font-size:10px;'>- Người đưa trẻ: "+gv("inpGuardian")+"</div>":"")+
-    "</td>"+
-    "<td style='width:38%;text-align:center;vertical-align:top;'>"+
-      "<div style='font-size:11px;'>"+dateStr+"</div>"+
-      "<div style='font-weight:700;margin-top:2px;'>Bác sĩ</div>"+
-      "<div style='font-style:italic;font-size:10px;color:#555;'>(Ký, ghi rõ họ tên)</div>"+
-      "<div style='margin-top:32px;font-weight:700;'>"+(gv("inpDoctor")||"")+"</div>"+
-    "</td></tr></table></div>";
+    // Lời dặn
+    (gv("inpNote")?"<div style='margin-top:10px;font-size:14px;'><b>Lời dặn:</b> "+gv("inpNote")+"</div>":"")+
+    "<div style='font-style:italic;font-size:13px;margin-top:6px;'>- Khám bệnh lại xin mang theo đơn này.</div>"+
+    (gv("inpPhone")?"<div style='font-size:13px;margin-top:3px;'>- Số điện thoại liên hệ: "+gv("inpPhone")+"</div>":"")+
+    (gv("inpGuardian")?"<div style='font-size:13px;margin-top:3px;'>- Người đưa trẻ đến khám: "+gv("inpGuardian")+"</div>":"")+
+    // Ký tên
+    "<div style='margin-top:20px;display:flex;justify-content:flex-end;'>"+
+    "<div style='text-align:center;min-width:200px;'>"+
+      "<div style='font-size:14px;'>"+dateStr+"</div>"+
+      "<div style='font-weight:700;font-size:14px;margin-top:4px;'>Bác sĩ</div>"+
+      "<div style='font-style:italic;font-size:12px;color:#555;'>(Ký, ghi rõ họ tên)</div>"+
+      "<div style='margin-top:60px;font-weight:700;font-size:14px;'>"+(gv("inpDoctor")||"")+"</div>"+
+    "</div></div></div>";
 }
 
 // ══════════════════════════════════════════════
@@ -1485,11 +1480,14 @@ function buildRx(){
 // ══════════════════════════════════════════════
 function previewRx(){ document.getElementById("modalContent").innerHTML=buildRx(); document.getElementById("modal").style.display="block"; }
 function printRx(){
-  var win=window.open("","_blank","width=850,height=620");
+  var win=window.open("","_blank","width=794,height=1123");
   if(!win){ alert("Trình duyệt đang chặn pop-up. Vui lòng cho phép."); return; }
   win.document.write("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Đơn thuốc</title>"+
-    "<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Times New Roman',serif;background:#fff;font-size:12px;}"+
-    "@page{size:A5 landscape;margin:10mm 12mm;}@media print{html,body{width:210mm;}}table{width:100%;border-collapse:collapse;}"+
+    "<style>"+
+    "*{box-sizing:border-box;margin:0;padding:0;}"+
+    "body{font-family:'Times New Roman',serif;background:#fff;font-size:14px;}"+
+    "@page{size:A4 portrait;margin:20mm 20mm 20mm 25mm;}"+
+    "table{width:100%;border-collapse:collapse;}"+
     "</style></head><body>"+buildRx()+"</body></html>");
   win.document.close(); win.focus(); setTimeout(function(){ win.print(); },600);
 }
