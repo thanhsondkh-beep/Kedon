@@ -364,7 +364,9 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
 
     <!-- Panel: Mở đơn mẫu -->
     <div id="tplPanelLoad">
-      <div id="tplListWrap" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rad);">
+      <input id="tplSearch" placeholder="🔍 Tìm đơn mẫu..." autocomplete="off"
+        style="width:100%;border:1.5px solid var(--border);border-radius:4px;padding:7px 10px;font-size:13px;font-family:Arial,sans-serif;outline:none;margin-bottom:8px;">
+      <div id="tplListWrap" style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rad);">
         <div id="tplList"></div>
       </div>
       <div style="font-size:11px;color:var(--ink2);font-family:Arial,sans-serif;margin-top:7px;">
@@ -1564,7 +1566,9 @@ function openSaveTemplate() {
 
 // Mở modal MỞ đơn mẫu
 function openLoadTemplate() {
-  renderTemplateList();
+  var srch = document.getElementById("tplSearch");
+  if (srch) srch.value = "";
+  renderTemplateList("");
   // Chuyển sang tab Mở
   document.getElementById("tplTabSave").classList.remove("active");
   document.getElementById("tplTabLoad").classList.add("active");
@@ -1574,10 +1578,17 @@ function openLoadTemplate() {
 }
 
 // Render danh sách đơn mẫu
-function renderTemplateList() {
+function renderTemplateList(q) {
   var wrap = document.getElementById("tplList");
-  if (!TEMPLATE_DB.length) {
-    wrap.innerHTML = "<div style='padding:20px;text-align:center;color:#aaa;font-size:13px;font-family:Arial,sans-serif;'>Chưa có đơn mẫu nào.<br>Tạo đơn và nhấn <b>💾 Lưu đơn mẫu</b>.</div>";
+  var list = q ? TEMPLATE_DB.filter(function(t){
+    return t.name.toLowerCase().includes(q) ||
+           (t.chandoan||"").toLowerCase().includes(q) ||
+           t.drugs.some(function(d){ return d.name.toLowerCase().includes(q); });
+  }) : TEMPLATE_DB;
+
+  if (!list.length) {
+    wrap.innerHTML = "<div style='padding:20px;text-align:center;color:#aaa;font-size:13px;font-family:Arial,sans-serif;'>" +
+      (q ? "Không tìm thấy đơn mẫu nào." : "Chưa có đơn mẫu nào.<br>Tạo đơn và nhấn <b>💾 Lưu đơn mẫu</b>.") + "</div>";
     return;
   }
   wrap.innerHTML = "";
@@ -1619,7 +1630,7 @@ function renderTemplateList() {
     btnDel.addEventListener("click", function() {
       if (!confirm("Xóa đơn mẫu: " + tpl.name + "?")) return;
       TEMPLATE_DB.splice(idx, 1);
-      saveDB(); renderTemplateList();
+      saveDB(); renderTemplateList((document.getElementById("tplSearch")||{}).value||"");
       showToast("Đã xóa đơn mẫu: " + tpl.name);
     });
 
@@ -1678,11 +1689,16 @@ function initTemplateModal() {
   document.getElementById("tplModal").addEventListener("click", function(e){ if(e.target===this) this.style.display="none"; });
   document.getElementById("tplConfirmModal").addEventListener("click", function(e){ if(e.target===this) this.style.display="none"; });
 
+  // Tìm kiếm đơn mẫu
+  document.getElementById("tplSearch").addEventListener("input", function(){
+    renderTemplateList(this.value.toLowerCase().trim());
+  });
+
   // Tab switching
   document.getElementById("tplTabLoad").addEventListener("click", function(){
     this.classList.add("active"); document.getElementById("tplTabSave").classList.remove("active");
     document.getElementById("tplPanelLoad").style.display="block"; document.getElementById("tplPanelSave").style.display="none";
-    renderTemplateList();
+    renderTemplateList((document.getElementById("tplSearch")||{}).value||"");
   });
   document.getElementById("tplTabSave").addEventListener("click", function(){
     this.classList.add("active"); document.getElementById("tplTabLoad").classList.remove("active");
