@@ -1090,7 +1090,7 @@ function acSearchDrug(inp, drop, acIdx) {
     var q=inp.value.toLowerCase().trim();
     drop.innerHTML=""; drop.style.display="none";
     if(!q||q.length<1) return;
-    var hits=DRUG_DB.filter(function(d){ return d.display.toLowerCase().includes(q)||d.hoatchat.toLowerCase().includes(q)||d.tenthuoc.toLowerCase().includes(q); }).slice(0,18);
+    var hits=DRUG_DB.filter(function(d){ return !d.locked && (d.display.toLowerCase().includes(q)||d.hoatchat.toLowerCase().includes(q)||d.tenthuoc.toLowerCase().includes(q)); }).slice(0,18);
     if(!hits.length) return;
     hits.forEach(function(d,i){
       var item=document.createElement("div"); item.className="ac-item";
@@ -1367,7 +1367,7 @@ function buildRx(){
     "<div style='font-style:italic;font-size:11px;margin-top:3px;'>- Khám bệnh lại xin mang theo đơn này.</div>"+
     (gv("inpPhone")?"<div style='font-size:11px;'>- Số điện thoại liên hệ: "+gv("inpPhone")+"</div>":"")+
     (gv("inpGuardian")?"<div style='font-size:11px;'>- Người đưa trẻ đến khám: "+gv("inpGuardian")+"</div>":"")+
-    "<div style='margin-top:12px;text-align:right;'>"+
+    "<div style='margin-top:12px;text-align:center;'>"+
     "<div>"+dateStr+"</div>"+
     "<div style='font-weight:700;margin-top:1px;'>Bác sĩ</div>"+
     "<div style='font-style:italic;font-size:10px;color:#555;'>(Ký, ghi rõ họ tên)</div>"+
