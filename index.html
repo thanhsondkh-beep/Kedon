@@ -272,7 +272,13 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
         <div class="f"><label>Cân nặng (kg) — bắt buộc trẻ &lt;72 tháng</label><input type="number" id="inpWeight" placeholder="..." data-tab="5"></div>
         <div class="f"><label>Số CCCD / CMND / hộ chiếu</label><input id="inpID" placeholder="..." data-tab="6"></div>
         <div class="f"><label>Mã số BHYT</label><input id="inpBHYT" placeholder="..." data-tab="7"></div>
-        <div class="f full"><label>Nơi ở hiện tại</label><input id="inpAddr" placeholder="..." data-tab="8"></div>
+        <div class="f full">
+          <label>Nơi ở hiện tại</label>
+          <div style="display:flex;gap:5px;">
+            <input id="inpAddr" placeholder="Gõ hoặc chọn địa chỉ..." data-tab="8" list="addrList" autocomplete="off" style="flex:1;">
+            <datalist id="addrList"></datalist>
+          </div>
+        </div>
 
         <!-- Chẩn đoán có autocomplete từ danh mục bệnh -->
         <div class="f full">
@@ -408,6 +414,7 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
       <button class="mg-tab active" data-tab="bacsi">👨‍⚕️ Bác sĩ</button>
       <button class="mg-tab" data-tab="loidan">📝 Lời dặn</button>
       <button class="mg-tab" data-tab="benh">🏥 Danh mục bệnh</button>
+      <button class="mg-tab" data-tab="addr">📍 Địa chỉ</button>
     </div>
 
     <!-- Panel bác sĩ -->
@@ -437,6 +444,15 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
       </div>
       <div id="mgBenhList" class="mg-list"></div>
     </div>
+
+    <!-- Panel địa chỉ -->
+    <div class="mg-panel" id="mgPanelAddr" style="display:none;">
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <input id="mgAddrText" placeholder="Thêm địa chỉ mới..." style="flex:1;border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:13px;font-family:'Times New Roman',serif;outline:none;">
+        <button class="btn btn-p" id="mgAddrAdd" style="padding:5px 12px;white-space:nowrap;">＋ Thêm</button>
+      </div>
+      <div id="mgAddrList" class="mg-list"></div>
+    </div>
   </div>
 </div>
 
@@ -449,6 +465,7 @@ var BACSI_DB = [{"ten": "Vũ Đình Trung", "sdt": "973701533"}];
 var LOIDAN_DB= ["Tái khám dúng theo quy định"];
 var BENH_DB  = ["Viêm phổi", "Tắc nghẽn phổi mãn tính", "Viêm loét dạ dày tá tràng"];
 var TEMPLATE_DB = []; // Đơn mẫu
+var ADDR_DB = []; // Danh sách địa chỉ thường dùng
 
 // ══════════════════════════════════════════════
 // KHỞI TẠO
@@ -468,6 +485,8 @@ document.addEventListener("DOMContentLoaded", function() {
     if (sbn) { var p4 = JSON.parse(sbn); if (Array.isArray(p4) && p4.length) BENH_DB = p4; }
     var stp = localStorage.getItem("bvhh_tpl_db");
     if (stp) { var p5 = JSON.parse(stp); if (Array.isArray(p5)) TEMPLATE_DB = p5; }
+    var sad = localStorage.getItem("bvhh_addr_db");
+    if (sad) { var p6 = JSON.parse(sad); if (Array.isArray(p6)) ADDR_DB = p6; }
   } catch(e) {}
 
   // Render ngay với dữ liệu local
@@ -481,6 +500,8 @@ document.addEventListener("DOMContentLoaded", function() {
     renderDrugList(DRUG_DB);
     populateBacsi(BACSI_DB);
     populateLoidan(LOIDAN_DB);
+    var dl = document.getElementById("addrList");
+    if (dl) { dl.innerHTML=""; ADDR_DB.forEach(function(a){ var o=document.createElement("option"); o.value=a; dl.appendChild(o); }); }
   });
 
   // Sync header live
@@ -745,7 +766,12 @@ document.addEventListener("DOMContentLoaded", function() {
     if (e.key !== "Enter") return;
     var items = document.getElementById("dropDx").querySelectorAll(".ac-item");
     var open = document.getElementById("dropDx").style.display !== "none" && items.length > 0;
-    if (!open) { e.preventDefault(); var next = document.getElementById("inpDate"); if (next) next.focus(); }
+    if (!open) {
+      e.preventDefault();
+      var firstDrug = document.querySelector("#drugBody .dn-inp");
+      if (firstDrug) { firstDrug.focus(); }
+      else { var next = document.getElementById("inpDate"); if (next) next.focus(); }
+    }
   }, true);
 
   // ── Quản lý danh mục ──
@@ -757,7 +783,7 @@ document.addEventListener("DOMContentLoaded", function() {
       document.querySelectorAll(".mg-tab").forEach(function(t){ t.classList.remove("active"); });
       document.querySelectorAll(".mg-panel").forEach(function(p){ p.style.display="none"; });
       tab.classList.add("active");
-      var panelId = { bacsi:"mgPanelBacsi", loidan:"mgPanelLoidan", benh:"mgPanelBenh" }[tab.dataset.tab];
+      var panelId = { bacsi:"mgPanelBacsi", loidan:"mgPanelLoidan", benh:"mgPanelBenh", addr:"mgPanelAddr" }[tab.dataset.tab];
       document.getElementById(panelId).style.display="block";
     });
   });
@@ -795,6 +821,38 @@ document.addEventListener("DOMContentLoaded", function() {
     showToast("✓ Đã thêm bệnh: "+v);
   });
   document.getElementById("mgBenhText").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("mgBenhAdd").click(); } });
+  // Địa chỉ
+  document.getElementById("mgAddrAdd").addEventListener("click", function(){
+    var v = document.getElementById("mgAddrText").value.trim();
+    if (!v) return;
+    if (!ADDR_DB.includes(v)) {
+      ADDR_DB.push(v); populateAddrList(); saveDB();
+    }
+    renderMgAddr();
+    document.getElementById("mgAddrText").value=""; document.getElementById("mgAddrText").focus();
+    showToast("✓ Đã thêm địa chỉ");
+  });
+  document.getElementById("mgAddrText").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("mgAddrAdd").click(); } });
+
+  // ── Địa chỉ: datalist + tự lưu địa chỉ mới ──
+  function populateAddrList() {
+    var dl = document.getElementById("addrList");
+    if (!dl) return;
+    dl.innerHTML = "";
+    ADDR_DB.forEach(function(a) {
+      var opt = document.createElement("option"); opt.value = a; dl.appendChild(opt);
+    });
+  }
+  populateAddrList();
+  // Khi blur khỏi ô địa chỉ → tự lưu nếu là địa chỉ mới
+  document.getElementById("inpAddr").addEventListener("blur", function() {
+    var v = this.value.trim();
+    if (v && !ADDR_DB.includes(v)) {
+      ADDR_DB.push(v);
+      populateAddrList();
+      saveDB();
+    }
+  });
 
   // ── Sidebar resize ──
   var sbEl = document.getElementById("sidebar");
@@ -825,8 +883,7 @@ document.addEventListener("DOMContentLoaded", function() {
 // QUẢN LÝ DANH MỤC
 // ══════════════════════════════════════════════
 function openManage() {
-  renderMgBacsi(); renderMgLoidan(); renderMgBenh();
-  // Reset về tab đầu
+  renderMgBacsi(); renderMgLoidan(); renderMgBenh(); renderMgAddr();
   document.querySelectorAll(".mg-tab").forEach(function(t){ t.classList.remove("active"); });
   document.querySelectorAll(".mg-panel").forEach(function(p){ p.style.display="none"; });
   document.querySelector(".mg-tab[data-tab='bacsi']").classList.add("active");
@@ -858,6 +915,20 @@ function renderMgLoidan() {
     var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
     btn.addEventListener("click", function(){
       LOIDAN_DB.splice(i,1); populateLoidan(LOIDAN_DB); renderMgLoidan(); saveDB();
+    });
+    row.appendChild(sp); row.appendChild(btn); list.appendChild(row);
+  });
+}
+function renderMgAddr() {
+  var list = document.getElementById("mgAddrList");
+  if (!ADDR_DB.length) { list.innerHTML="<div style='padding:12px;text-align:center;color:#aaa;font-size:12px;'>Chưa có địa chỉ nào. Địa chỉ tự thêm khi bạn điền vào ô Nơi ở.</div>"; return; }
+  list.innerHTML = "";
+  ADDR_DB.forEach(function(a, i) {
+    var row = document.createElement("div"); row.className="mg-row";
+    var sp = document.createElement("span"); sp.textContent = a; sp.style.fontSize="12px";
+    var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
+    btn.addEventListener("click", function(){
+      ADDR_DB.splice(i,1); populateAddrList(); saveDB(); renderMgAddr();
     });
     row.appendChild(sp); row.appendChild(btn); list.appendChild(row);
   });
@@ -928,6 +999,7 @@ function saveDB() {
     localStorage.setItem("bvhh_loidan_db", JSON.stringify(LOIDAN_DB));
     localStorage.setItem("bvhh_benh_db",   JSON.stringify(BENH_DB));
     localStorage.setItem("bvhh_tpl_db",    JSON.stringify(TEMPLATE_DB));
+    localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
   } catch(e) {}
   // Lưu Firestore debounce 800ms
   clearTimeout(saveTimeout);
@@ -957,6 +1029,7 @@ function saveToFirestore() {
     loidan:  LOIDAN_DB,
     benh:    BENH_DB,
     templates: TEMPLATE_DB,
+    addresses: ADDR_DB,
     updatedAt: Date.now()
   })
   .then(function() { setSyncStatus("ok", "✅ Đã đồng bộ lên cloud"); })
@@ -974,6 +1047,7 @@ function loadFromFirestore(callback) {
         if (data.loidan && data.loidan.length > 0) LOIDAN_DB  = data.loidan;
         if (data.benh   && data.benh.length   > 0) BENH_DB    = data.benh;
         if (data.templates && data.templates.length > 0) TEMPLATE_DB = data.templates;
+        if (data.addresses && data.addresses.length > 0) ADDR_DB = data.addresses;
         // Cập nhật cache localStorage
         try {
           localStorage.setItem("bvhh_drug_db",   JSON.stringify(DRUG_DB));
@@ -981,6 +1055,8 @@ function loadFromFirestore(callback) {
           localStorage.setItem("bvhh_loidan_db", JSON.stringify(LOIDAN_DB));
           localStorage.setItem("bvhh_benh_db",   JSON.stringify(BENH_DB));
           localStorage.setItem("bvhh_tpl_db",    JSON.stringify(TEMPLATE_DB));
+          localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
+    localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
         } catch(e) {}
         setSyncStatus("ok", "✅ Đã tải dữ liệu từ cloud");
         if (!doc.data().drugs || !doc.data().drugs.length) {
@@ -1436,9 +1512,9 @@ function buildRx(){
     // Header
     "<div style='font-size:13px;font-weight:700;text-transform:uppercase;text-align:left;margin-bottom:3px;'>"+hosp+"</div>"+
     "<div style='font-size:12px;text-align:left;margin-bottom:2px;'>"+addr+(gv("inpTel")?" — ĐT: "+gv("inpTel"):"")+"</div>"+
-    "<hr style='border:none;border-top:1.5px solid #000;margin:6px 0;'>"+
-    "<div style='text-align:center;font-size:22px;font-weight:700;letter-spacing:3px;margin:8px 0 4px;'>ĐƠN THUỐC</div>"+
-    "<hr style='border:none;border-top:1px solid #999;margin:4px 0 10px;'>"+
+    ""+
+    "<div style='text-align:center;font-size:22px;font-weight:700;letter-spacing:3px;margin:8px 0 12px;border-bottom:1px solid #000;padding-bottom:6px;'>ĐƠN THUỐC</div>"+
+    ""+
     // Thông tin bệnh nhân
     "<div style='margin-bottom:5px;font-size:14px;'><b>Họ và tên:</b> "+(gv("inpName")||".....................................................................")+"</div>"+
     "<div style='display:flex;gap:30px;margin-bottom:5px;font-size:14px;'>"+
@@ -1453,12 +1529,12 @@ function buildRx(){
     // Bảng thuốc
     "<div style='font-weight:700;font-size:14px;margin-bottom:5px;'>Thuốc điều trị:</div>"+
     "<table style='width:100%;border-collapse:collapse;font-size:13px;'>"+
-    "<thead><tr style='background:#1a5fa8;color:#fff;'>"+
-    "<th style='padding:6px 5px;border:1px solid #1a5fa8;width:36px;text-align:center;'>STT</th>"+
-    "<th style='padding:6px 8px;border:1px solid #1a5fa8;text-align:left;'>Tên thuốc</th>"+
-    "<th style='padding:6px 5px;border:1px solid #1a5fa8;width:52px;text-align:center;'>ĐVT</th>"+
-    "<th style='padding:6px 5px;border:1px solid #1a5fa8;width:44px;text-align:center;'>SL</th>"+
-    "<th style='padding:6px 8px;border:1px solid #1a5fa8;text-align:left;'>Cách dùng</th>"+
+    "<thead><tr style='background:#fff;color:#000;border-bottom:2px solid #000;'>"+
+    "<th style='padding:6px 5px;border:1px solid #bbb;width:36px;text-align:center;font-weight:700;'>STT</th>"+
+    "<th style='padding:6px 8px;border:1px solid #bbb;text-align:left;font-weight:700;'>Tên thuốc</th>"+
+    "<th style='padding:6px 5px;border:1px solid #bbb;width:52px;text-align:center;font-weight:700;'>ĐVT</th>"+
+    "<th style='padding:6px 5px;border:1px solid #bbb;width:44px;text-align:center;font-weight:700;'>SL</th>"+
+    "<th style='padding:6px 8px;border:1px solid #bbb;text-align:left;font-weight:700;'>Cách dùng</th>"+
     "</tr></thead><tbody>"+drugRows+"</tbody></table>"+
     // Lời dặn
     (gv("inpNote")?"<div style='margin-top:10px;font-size:14px;'><b>Lời dặn:</b> "+gv("inpNote")+"</div>":"")+
