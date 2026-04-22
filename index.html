@@ -415,6 +415,7 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
       <button class="mg-tab" data-tab="loidan">📝 Lời dặn</button>
       <button class="mg-tab" data-tab="benh">🏥 Danh mục bệnh</button>
       <button class="mg-tab" data-tab="addr">📍 Địa chỉ</button>
+      <button class="mg-tab" data-tab="shortcut">⌨ Gõ tắt</button>
     </div>
 
     <!-- Panel bác sĩ -->
@@ -453,6 +454,21 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
       </div>
       <div id="mgAddrList" class="mg-list"></div>
     </div>
+
+    <!-- Panel gõ tắt -->
+    <div class="mg-panel" id="mgPanelShortcut" style="display:none;">
+      <div style="font-size:11px;color:var(--ink2);font-family:Arial,sans-serif;margin-bottom:7px;line-height:1.5;">
+        💡 Gõ từ khóa tắt vào ô <b>Cách dùng</b> rồi nhấn <b>Space</b> hoặc <b>Tab</b> → tự động mở rộng.
+      </div>
+      <div style="display:flex;gap:5px;margin-bottom:8px;align-items:flex-start;">
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1;">
+          <input id="mgScKey" placeholder="Từ tắt (VD: 1v2l)..." style="border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:13px;font-family:'Times New Roman',serif;outline:none;">
+          <input id="mgScFull" placeholder="Nội dung đầy đủ (VD: 1 viên x 2 lần/ngày)..." style="border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:13px;font-family:'Times New Roman',serif;outline:none;">
+        </div>
+        <button class="btn btn-p" id="mgScAdd" style="padding:5px 12px;white-space:nowrap;align-self:stretch;">＋ Thêm</button>
+      </div>
+      <div id="mgScList" class="mg-list"></div>
+    </div>
   </div>
 </div>
 
@@ -466,6 +482,16 @@ var LOIDAN_DB= ["Tái khám dúng theo quy định"];
 var BENH_DB  = ["Viêm phổi", "Tắc nghẽn phổi mãn tính", "Viêm loét dạ dày tá tràng"];
 var TEMPLATE_DB = []; // Đơn mẫu
 var ADDR_DB = []; // Danh sách địa chỉ thường dùng
+var SHORTCUT_DB = [
+  {key:"1v1l",full:"1 viên x 1 lần/ngày"},
+  {key:"1v2l",full:"1 viên x 2 lần/ngày"},
+  {key:"1v3l",full:"1 viên x 3 lần/ngày"},
+  {key:"2v2l",full:"2 viên x 2 lần/ngày"},
+  {key:"1v1ls",full:"1 viên x 1 lần/ngày (sáng)"},
+  {key:"1v1lt",full:"1 viên x 1 lần/ngày (tối)"},
+  {key:"1o1l",full:"1 ống x 1 lần/ngày"},
+  {key:"1o2l",full:"1 ống x 2 lần/ngày"}
+]; // Từ điển gõ tắt cách dùng
 
 // ══════════════════════════════════════════════
 // KHỞI TẠO
@@ -487,6 +513,8 @@ document.addEventListener("DOMContentLoaded", function() {
     if (stp) { var p5 = JSON.parse(stp); if (Array.isArray(p5)) TEMPLATE_DB = p5; }
     var sad = localStorage.getItem("bvhh_addr_db");
     if (sad) { var p6 = JSON.parse(sad); if (Array.isArray(p6)) ADDR_DB = p6; }
+    var ssc = localStorage.getItem("bvhh_sc_db");
+    if (ssc) { var p7 = JSON.parse(ssc); if (Array.isArray(p7)) SHORTCUT_DB = p7; }
   } catch(e) {}
 
   // Render ngay với dữ liệu local
@@ -785,7 +813,7 @@ document.addEventListener("DOMContentLoaded", function() {
       document.querySelectorAll(".mg-tab").forEach(function(t){ t.classList.remove("active"); });
       document.querySelectorAll(".mg-panel").forEach(function(p){ p.style.display="none"; });
       tab.classList.add("active");
-      var panelId = { bacsi:"mgPanelBacsi", loidan:"mgPanelLoidan", benh:"mgPanelBenh", addr:"mgPanelAddr" }[tab.dataset.tab];
+      var panelId = { bacsi:"mgPanelBacsi", loidan:"mgPanelLoidan", benh:"mgPanelBenh", addr:"mgPanelAddr", shortcut:"mgPanelShortcut" }[tab.dataset.tab];
       document.getElementById(panelId).style.display="block";
     });
   });
@@ -836,6 +864,27 @@ document.addEventListener("DOMContentLoaded", function() {
   });
   document.getElementById("mgAddrText").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("mgAddrAdd").click(); } });
 
+  // ── Gõ tắt cách dùng ──
+  document.getElementById("mgScAdd").addEventListener("click", function(){
+    var k = document.getElementById("mgScKey").value.trim().toLowerCase().replace(/\s+/g,"");
+    var f = document.getElementById("mgScFull").value.trim();
+    if (!k || !f) return;
+    var exists = SHORTCUT_DB.findIndex(function(s){ return s.key === k; });
+    if (exists >= 0) {
+      if (!confirm("Từ tắt '" + k + "' đã có. Ghi đè?")) return;
+      SHORTCUT_DB[exists].full = f;
+    } else {
+      SHORTCUT_DB.push({key:k, full:f});
+    }
+    saveDB(); renderMgShortcut();
+    document.getElementById("mgScKey").value="";
+    document.getElementById("mgScFull").value="";
+    document.getElementById("mgScKey").focus();
+    showToast("✓ Đã thêm gõ tắt: " + k + " → " + f);
+  });
+  document.getElementById("mgScKey").addEventListener("keydown",  function(e){ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("mgScFull").focus(); } });
+  document.getElementById("mgScFull").addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); document.getElementById("mgScAdd").click(); } });
+
   // ── Địa chỉ: datalist + tự lưu địa chỉ mới ──
   function populateAddrList() {
     var dl = document.getElementById("addrList");
@@ -885,7 +934,7 @@ document.addEventListener("DOMContentLoaded", function() {
 // QUẢN LÝ DANH MỤC
 // ══════════════════════════════════════════════
 function openManage() {
-  renderMgBacsi(); renderMgLoidan(); renderMgBenh(); renderMgAddr();
+  renderMgBacsi(); renderMgLoidan(); renderMgBenh(); renderMgAddr(); renderMgShortcut();
   document.querySelectorAll(".mg-tab").forEach(function(t){ t.classList.remove("active"); });
   document.querySelectorAll(".mg-panel").forEach(function(p){ p.style.display="none"; });
   document.querySelector(".mg-tab[data-tab='bacsi']").classList.add("active");
@@ -921,6 +970,53 @@ function renderMgLoidan() {
     row.appendChild(sp); row.appendChild(btn); list.appendChild(row);
   });
 }
+function renderMgShortcut() {
+  var list = document.getElementById("mgScList");
+  if (!SHORTCUT_DB.length) {
+    list.innerHTML="<div style='padding:12px;text-align:center;color:#aaa;font-size:12px;'>Chưa có từ tắt nào.</div>";
+    return;
+  }
+  list.innerHTML = "";
+  SHORTCUT_DB.forEach(function(s, i) {
+    var row = document.createElement("div"); row.className="mg-row";
+    row.style.cssText = "display:flex;align-items:center;gap:8px;padding:7px 11px;border-bottom:1px solid #eef2f8;";
+    var keyTag = document.createElement("span");
+    keyTag.style.cssText = "background:#e8f0fb;color:var(--blue);border-radius:3px;padding:2px 7px;font-size:12px;font-family:Arial,sans-serif;font-weight:700;white-space:nowrap;min-width:60px;text-align:center;";
+    keyTag.textContent = s.key;
+    var arrow = document.createElement("span");
+    arrow.style.cssText = "color:var(--ink2);font-size:12px;";
+    arrow.textContent = "→";
+    var full = document.createElement("span");
+    full.style.cssText = "flex:1;font-size:13px;";
+    full.textContent = s.full;
+    var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
+    btn.addEventListener("click", function(){
+      SHORTCUT_DB.splice(i,1); saveDB(); renderMgShortcut();
+    });
+    row.appendChild(keyTag); row.appendChild(arrow); row.appendChild(full); row.appendChild(btn);
+    list.appendChild(row);
+  });
+}
+
+// Hàm mở rộng gõ tắt trong ô cách dùng
+function applyShortcut(inp) {
+  var val = inp.value;
+  // Tìm từ cuối cùng trước dấu space ở cuối
+  var trimmed = val.trimEnd();
+  if (!trimmed) return false;
+  // Lấy từ cuối (không có khoảng trắng bên trong)
+  var lastSpace = trimmed.lastIndexOf(" ");
+  var lastWord = (lastSpace >= 0 ? trimmed.substring(lastSpace + 1) : trimmed).toLowerCase();
+  var sc = SHORTCUT_DB.find(function(s){ return s.key === lastWord; });
+  if (!sc) return false;
+  // Thay thế từ tắt
+  var before = lastSpace >= 0 ? trimmed.substring(0, lastSpace + 1) : "";
+  inp.value = before + sc.full + " ";
+  // Đặt con trỏ về cuối
+  inp.selectionStart = inp.selectionEnd = inp.value.length;
+  return true;
+}
+
 function renderMgAddr() {
   var list = document.getElementById("mgAddrList");
   if (!ADDR_DB.length) { list.innerHTML="<div style='padding:12px;text-align:center;color:#aaa;font-size:12px;'>Chưa có địa chỉ nào. Địa chỉ tự thêm khi bạn điền vào ô Nơi ở.</div>"; return; }
@@ -1002,6 +1098,7 @@ function saveDB() {
     localStorage.setItem("bvhh_benh_db",   JSON.stringify(BENH_DB));
     localStorage.setItem("bvhh_tpl_db",    JSON.stringify(TEMPLATE_DB));
     localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
+    localStorage.setItem("bvhh_sc_db",     JSON.stringify(SHORTCUT_DB));
   } catch(e) {}
   // Lưu Firestore debounce 800ms
   clearTimeout(saveTimeout);
@@ -1032,6 +1129,7 @@ function saveToFirestore() {
     benh:    BENH_DB,
     templates: TEMPLATE_DB,
     addresses: ADDR_DB,
+    shortcuts: SHORTCUT_DB,
     updatedAt: Date.now()
   })
   .then(function() { setSyncStatus("ok", "✅ Đã đồng bộ lên cloud"); })
@@ -1050,6 +1148,7 @@ function loadFromFirestore(callback) {
         if (data.benh   && data.benh.length   > 0) BENH_DB    = data.benh;
         if (data.templates && data.templates.length > 0) TEMPLATE_DB = data.templates;
         if (data.addresses && data.addresses.length > 0) ADDR_DB = data.addresses;
+        if (data.shortcuts) SHORTCUT_DB = data.shortcuts;
         // Cập nhật cache localStorage
         try {
           localStorage.setItem("bvhh_drug_db",   JSON.stringify(DRUG_DB));
@@ -1058,7 +1157,10 @@ function loadFromFirestore(callback) {
           localStorage.setItem("bvhh_benh_db",   JSON.stringify(BENH_DB));
           localStorage.setItem("bvhh_tpl_db",    JSON.stringify(TEMPLATE_DB));
           localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
+          localStorage.setItem("bvhh_sc_db",     JSON.stringify(SHORTCUT_DB));
+    localStorage.setItem("bvhh_sc_db",     JSON.stringify(SHORTCUT_DB));
     localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
+    localStorage.setItem("bvhh_sc_db",     JSON.stringify(SHORTCUT_DB));
         } catch(e) {}
         setSyncStatus("ok", "✅ Đã tải dữ liệu từ cloud");
         if (!doc.data().drugs || !doc.data().drugs.length) {
@@ -1241,7 +1343,17 @@ function addDrugRow(drug) {
   tdS.appendChild(iSl); tr.appendChild(tdS);
   // Cách dùng
   var tdU=document.createElement("td"); var iU=document.createElement("input"); iU.type="text"; iU.className="cd-inp"; iU.placeholder="Liều, số lần, thời điểm...";
-  iU.addEventListener("keydown", function(e){ if(e.key==="Enter"){ e.preventDefault(); rowFocusNext(this); } });
+  iU.addEventListener("keydown", function(e){
+    if(e.key==="Enter"){ e.preventDefault(); rowFocusNext(this); return; }
+    if(e.key===" " || e.key==="Tab"){
+      var self = this;
+      // setTimeout 0: chờ browser thêm ký tự vào input rồi mới xử lý
+      setTimeout(function(){
+        var expanded = applyShortcut(self);
+        if(expanded && e.key==="Tab"){ rowFocusNext(self); }
+      }, 0);
+    }
+  });
   tdU.appendChild(iU); tr.appendChild(tdU);
   // Xóa
   var tdX=document.createElement("td"); var bx=document.createElement("button"); bx.className="btn-rm"; bx.textContent="✕"; bx.title="Xóa dòng";
