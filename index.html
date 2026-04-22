@@ -87,6 +87,10 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
 .dtable input{border:1px solid var(--border);border-radius:3px;padding:4px 6px;font-size:14px;font-family:"Times New Roman",serif;width:100%;outline:none;background:transparent;}
 .dtable input:focus{border-color:var(--blue);background:#fff;}
 .btn-rm{background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0 2px;line-height:1;}
+.drag-handle{cursor:grab;color:var(--ink2);font-size:15px;padding:0 4px;line-height:1;opacity:.5;flex-shrink:0;user-select:none;}
+.drag-handle:hover{opacity:1;}
+.drug-row-dragging{opacity:.4;background:var(--blue-light)!important;}
+.drug-row-dragover{border-top:2px solid var(--blue);}
 .btn-add{background:var(--blue-light);color:var(--blue);border:1.5px dashed var(--blue);width:100%;padding:7px;margin-top:5px;border-radius:var(--rad);cursor:pointer;font-size:13px;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;gap:4px;}
 .btn-add:hover{background:#d0e4f7;}
 /* ─ autocomplete chung ─ */
@@ -294,7 +298,7 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
       <div class="sec">💊 Thuốc điều trị</div>
       <table class="dtable">
         <thead><tr>
-          <th style="width:28px">STT</th>
+          <th style="width:18px"></th><th style="width:28px">STT</th>
           <th>Tên thuốc</th>
           <th style="width:58px">ĐVT</th>
           <th style="width:50px">SL</th>
@@ -335,7 +339,10 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
 
     <div class="actions">
       <button class="btn btn-p" id="btnPrint">🖨 In đơn thuốc</button>
-      <button class="btn btn-g" id="btnWord">📄 Xuất Word</button>
+      <div style="display:flex;gap:4px;align-items:center;">
+        <button class="btn btn-g" id="btnWordA4">📄 Word A4</button>
+        <button class="btn btn-g" id="btnWordA5" style="background:#1a7a4a;">📄 Word A5</button>
+      </div>
       <button class="btn btn-o" id="btnPreview">👁 Xem trước</button>
       <button class="btn btn-o" id="btnSaveTemplate" style="margin-left:auto;">💾 Lưu đơn mẫu</button>
       <button class="btn btn-o" id="btnLoadTemplate">📂 Mở đơn mẫu</button>
@@ -610,7 +617,8 @@ document.addEventListener("DOMContentLoaded", function() {
   document.getElementById("btnNew").addEventListener("click", resetForm);
   document.getElementById("btnPrint").addEventListener("click", printRx);
   document.getElementById("btnPrint2").addEventListener("click", printRx);
-  document.getElementById("btnWord").addEventListener("click", exportWord);
+  document.getElementById("btnWordA4").addEventListener("click", function(){ exportWord("A4"); });
+  document.getElementById("btnWordA5").addEventListener("click", function(){ exportWord("A5"); });
   document.getElementById("btnPreview").addEventListener("click", previewRx);
   document.getElementById("btnSaveTemplate").addEventListener("click", openSaveTemplate);
   document.getElementById("btnLoadTemplate").addEventListener("click", openLoadTemplate);
@@ -1242,6 +1250,40 @@ function renderMgDrugList(q) {
     var info = document.createElement("div"); info.className = "mg-drug-info"; info.style.flex = "1";
     info.innerHTML = '<div class="mg-drug-name">' + d.display + (isLocked ? ' <span style="font-size:10px;color:#b87800;font-family:Arial,sans-serif;">[Hết hàng]</span>' : '') + '</div><div class="mg-drug-sub">' + d.dvt + '</div>';
 
+    // Form chỉnh sửa (ẩn mặc định)
+    var editForm = document.createElement("div");
+    editForm.style.cssText = "display:none;flex-direction:column;gap:4px;width:100%;margin-top:4px;padding:6px 8px;background:#f4f7fb;border-radius:4px;border:1px solid var(--border);";
+    var inp_hc  = document.createElement("input"); inp_hc.type="text";  inp_hc.value=d.hoatchat||""; inp_hc.placeholder="Hoạt chất...";
+    var inp_ten = document.createElement("input"); inp_ten.type="text"; inp_ten.value=d.tenthuoc||""; inp_ten.placeholder="Tên thuốc...";
+    var inp_dvt = document.createElement("input"); inp_dvt.type="text"; inp_dvt.value=d.dvt||"";     inp_dvt.placeholder="ĐVT..."; inp_dvt.style.width="100px";
+    var editStyle = "border:1px solid var(--border);border-radius:4px;padding:4px 7px;font-size:12px;font-family:'Times New Roman',serif;outline:none;width:100%;background:#fff;";
+    [inp_hc,inp_ten].forEach(function(i){ i.style.cssText=editStyle; });
+    inp_dvt.style.cssText = editStyle + "width:120px;";
+    var editRow2 = document.createElement("div"); editRow2.style.cssText="display:flex;gap:5px;";
+    editRow2.appendChild(inp_dvt);
+    var btnSaveEdit = document.createElement("button"); btnSaveEdit.textContent="✓ Lưu"; btnSaveEdit.style.cssText="background:var(--green);color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;font-family:Arial,sans-serif;cursor:pointer;";
+    var btnCancelEdit = document.createElement("button"); btnCancelEdit.textContent="Hủy"; btnCancelEdit.style.cssText="background:#fff;color:var(--ink2);border:1px solid var(--border);border-radius:4px;padding:4px 10px;font-size:12px;font-family:Arial,sans-serif;cursor:pointer;margin-left:4px;";
+    editRow2.appendChild(btnSaveEdit); editRow2.appendChild(btnCancelEdit);
+    editForm.appendChild(inp_hc); editForm.appendChild(inp_ten); editForm.appendChild(editRow2);
+
+    btnSaveEdit.addEventListener("click", function(){
+      var hc2  = inp_hc.value.trim();
+      var ten2 = inp_ten.value.trim();
+      var dvt2 = inp_dvt.value.trim();
+      if (!ten2) return;
+      d.hoatchat = hc2; d.tenthuoc = ten2; d.dvt = dvt2 || d.dvt;
+      // Tính lại display
+      var p2 = parseDrugName(ten2);
+      d.display = (hc2 && hc2 !== ten2) ? (p2.nd ? hc2+" ("+p2.c+") "+p2.nd : hc2+" ("+p2.c+")") : (p2.nd ? p2.c+" "+p2.nd : ten2);
+      saveDB();
+      renderDrugList(DRUG_DB);
+      renderMgDrugList(document.getElementById("mgDrugSearch").value.toLowerCase().trim());
+      showToast("✓ Đã cập nhật: " + d.display.substring(0,35));
+    });
+    btnCancelEdit.addEventListener("click", function(){
+      editForm.style.display="none"; editForm.style.flexDirection="column";
+    });
+
     // Nút khóa / mở khóa
     var btnLock = document.createElement("button");
     btnLock.className = "btn-lock" + (isLocked ? " locked-state" : "");
@@ -1269,7 +1311,16 @@ function renderMgDrugList(q) {
       }
     });
 
-    top.appendChild(info); top.appendChild(btnLock); top.appendChild(btnDel);
+    // Nút chỉnh sửa
+    var btnEdit = document.createElement("button");
+    btnEdit.textContent = "✏"; btnEdit.title = "Chỉnh sửa tên, hoạt chất, ĐVT";
+    btnEdit.style.cssText = "background:none;border:1px solid var(--blue);color:var(--blue);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;flex-shrink:0;";
+    btnEdit.addEventListener("click", function(){
+      if(editForm.style.display==="none" || !editForm.style.display){
+        editForm.style.display="flex"; inp_hc.value=d.hoatchat||""; inp_ten.value=d.tenthuoc||""; inp_dvt.value=d.dvt||""; inp_ten.focus();
+      } else { editForm.style.display="none"; }
+    });
+    top.appendChild(info); top.appendChild(btnEdit); top.appendChild(btnLock); top.appendChild(btnDel);
 
     // Hàng dưới: ô cách dùng (ẩn khi khóa)
     var cdRow = document.createElement("div");
@@ -1297,7 +1348,7 @@ function renderMgDrugList(q) {
     cdInp.addEventListener("keydown", function(e){ if (e.key === "Enter") { e.preventDefault(); btnSave.click(); } });
 
     cdRow.appendChild(cdInp); cdRow.appendChild(btnSave);
-    row.appendChild(top); row.appendChild(cdRow);
+    row.appendChild(top); row.appendChild(editForm); row.appendChild(cdRow);
     frag.appendChild(row);
   });
   c.innerHTML = ""; c.appendChild(frag);
@@ -1321,8 +1372,13 @@ function addDrugFromSidebar(drug) {
 function addDrugRow(drug) {
   var body=document.getElementById("drugBody");
   var tr=document.createElement("tr");
+  // Drag handle
+  var tdH=document.createElement("td"); tdH.style.cssText="width:18px;padding:0 2px;vertical-align:middle;";
+  var handle=document.createElement("span"); handle.className="drag-handle"; handle.textContent="⠿"; handle.title="Kéo để đổi thứ tự";
+  handle.setAttribute("draggable","false"); // row sẽ draggable
+  tdH.appendChild(handle); tr.appendChild(tdH);
   // STT
-  var tdN=document.createElement("td"); tdN.className="row-num"; tdN.style.cssText="text-align:center;font-weight:600;"; tdN.textContent=body.querySelectorAll("tr").length+1; tr.appendChild(tdN);
+  var tdN=document.createElement("td"); tdN.className="row-num"; tdN.style.cssText="text-align:center;font-weight:600;width:28px;"; tdN.textContent=body.querySelectorAll("tr").length; tr.appendChild(tdN);
   // Tên thuốc
   var tdTen=document.createElement("td");
   var wrap=document.createElement("div"); wrap.className="ac-wrap";
@@ -1358,6 +1414,18 @@ function addDrugRow(drug) {
   // Xóa
   var tdX=document.createElement("td"); var bx=document.createElement("button"); bx.className="btn-rm"; bx.textContent="✕"; bx.title="Xóa dòng";
   bx.addEventListener("click",function(){ tr.remove(); updateRowNums(); }); tdX.appendChild(bx); tr.appendChild(tdX);
+  // Drag-drop reorder
+  tr.setAttribute("draggable","true");
+  tr.addEventListener("dragstart",function(e){ e.dataTransfer.effectAllowed="move"; window._dragSrcRow=tr; tr.classList.add("drug-row-dragging"); });
+  tr.addEventListener("dragend",  function(){ tr.classList.remove("drug-row-dragging"); document.querySelectorAll("#drugBody tr").forEach(function(r){ r.classList.remove("drug-row-dragover"); }); });
+  tr.addEventListener("dragover", function(e){ e.preventDefault(); e.dataTransfer.dropEffect="move"; document.querySelectorAll("#drugBody tr").forEach(function(r){ r.classList.remove("drug-row-dragover"); }); tr.classList.add("drug-row-dragover"); });
+  tr.addEventListener("drop",     function(e){ e.preventDefault(); tr.classList.remove("drug-row-dragover");
+    var src=window._dragSrcRow; if(!src||src===tr) return;
+    var b=document.getElementById("drugBody");
+    var rows=Array.from(b.querySelectorAll("tr")); var srcI=rows.indexOf(src); var dstI=rows.indexOf(tr);
+    if(srcI<dstI) b.insertBefore(src,tr.nextSibling); else b.insertBefore(src,tr);
+    updateRowNums();
+  });
   body.appendChild(tr);
   if(drug) fillRow(tr,drug);
 }
@@ -1621,8 +1689,8 @@ function getDrugRows(){
 function buildRx(){
   var rows=getDrugRows();
   var dobVal=gv("inpDob"), age=gv("inpAge");
-  var dobStr=dobVal?dobVal.split("-").reverse().join("/"):(age?age+" tuổi":"..../..../........");
-  var ageExtra=(dobVal&&age)?" ("+age+" tuổi)":"";
+  var dobStr=dobVal?dobVal.split("-").reverse().join("/"):"..../..../........";
+  var ageStr=age?(dobVal?" ("+age+" tuổi)":"Tuổi: "+age):""; var ageExtra=ageStr;
   var dateStr=fmtDate(gv("inpDate"));
   var drugRows=rows.map(function(r){
     return "<tr>"+
@@ -1646,7 +1714,7 @@ function buildRx(){
     // Thông tin bệnh nhân
     "<div style='margin-bottom:5px;font-size:14px;'><b>Họ và tên:</b> "+(gv("inpName")||".....................................................................")+"</div>"+
     "<table style='width:100%;border-collapse:collapse;margin-bottom:5px;font-size:14px;'><tr>"+
-    "<td style='border:none;padding:0;width:50%;'><b>Ngày sinh:</b> "+dobStr+ageExtra+"</td>"+
+    "<td style='border:none;padding:0;width:50%;'>"+(dobVal?"<b>Ngày sinh:</b> "+dobStr+ageExtra:"<b>"+ageExtra+"</b>")+"</td>"+
     "<td style='border:none;padding:0;width:25%;'><b>Giới tính:</b> "+(gender||"□ Nam &nbsp; □ Nữ")+"</td>"+
     (gv("inpWeight")?"<td style='border:none;padding:0;'><b>Cân nặng:</b> "+gv("inpWeight")+" kg</td>":"<td style='border:none;'></td>")+
     "</tr></table>"+
@@ -1695,7 +1763,8 @@ function printRx(){
     "</style></head><body>"+buildRx()+"</body></html>");
   win.document.close(); win.focus(); setTimeout(function(){ win.print(); },600);
 }
-function exportWord(){
+function exportWord(pageSize){
+  pageSize = pageSize || "A4";
   var c = buildRx();
 
   // Word không hiểu flex → thay đoạn ký tên bằng table căn phải
@@ -1727,20 +1796,26 @@ function exportWord(){
 
   var full =
     "<!DOCTYPE html><html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>" +
-    "<head><meta charset='UTF-8'><style>" +
-    "body{font-family:'Times New Roman',serif;font-size:13pt;}" +
+    "<head><meta charset='UTF-8'>" +
+    (pageSize==="A5" ? "<xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml>" : "") +
+    "<style>" +
+    "body{font-family:'Times New Roman',serif;font-size:"+(pageSize==="A5"?"11":"13")+"pt;}" +
     "table{border-collapse:collapse;width:100%;}" +
-    "th,td{padding:4pt 5pt;}" +
+    "@page{size:"+(pageSize==="A5"?"210mm 148mm landscape":"A4 portrait")+";margin:"+(pageSize==="A5"?"5mm 12mm":"20mm 20mm 20mm 25mm")+
+      (pageSize==="A5" ? ";mso-page-orientation:landscape;" : "") + ";}" +
+    "th,td{padding:"+(pageSize==="A5"?"3pt 4pt":"4pt 5pt")+"}" +
     "th{font-weight:bold;border:1pt solid #999;}" +
     "td{border:1pt solid #999;}" +
     "td[style*='border:none'],th[style*='border:none']{border:none!important;}" +
-    "</style></head><body>" + c + "</body></html>";
+    "</style></head>" +
+    "<body style='"+(pageSize==="A5"?"mso-page-size:8391 11906;mso-page-orientation:landscape;":"")+"'>"+
+    c + "</body></html>";
 
   var blob = new Blob([full], {type:"application/msword;charset=utf-8"});
   var url  = URL.createObjectURL(blob);
   var a    = document.createElement("a");
   a.href   = url;
-  a.download = "DonThuoc_" + (gv("inpName").replace(/\s+/g,"_")||"BenhNhan") + "_" + (gv("inpDate").replace(/-/g,"")||"") + ".doc";
+  a.download = "DonThuoc_"+(pageSize==="A5"?"A5_":"")+(gv("inpName").replace(/\s+/g,"_")||"BenhNhan")+"_"+(gv("inpDate").replace(/-/g,"")||"")+".doc";
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   showToast("✓ Đã xuất file Word");
