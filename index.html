@@ -1533,11 +1533,11 @@ function buildRx(){
     ""+
     // Thông tin bệnh nhân
     "<div style='margin-bottom:5px;font-size:14px;'><b>Họ và tên:</b> "+(gv("inpName")||".....................................................................")+"</div>"+
-    "<div style='display:flex;gap:30px;margin-bottom:5px;font-size:14px;'>"+
-      "<span><b>Ngày sinh:</b> "+dobStr+ageExtra+"</span>"+
-      "<span><b>Giới tính:</b> "+(gender||"□ Nam &nbsp; □ Nữ")+"</span>"+
-      (gv("inpWeight")?"<span><b>Cân nặng:</b> "+gv("inpWeight")+" kg</span>":"")+
-    "</div>"+
+    "<table style='width:100%;border-collapse:collapse;margin-bottom:5px;font-size:14px;'><tr>"+
+    "<td style='border:none;padding:0;width:50%;'><b>Ngày sinh:</b> "+dobStr+ageExtra+"</td>"+
+    "<td style='border:none;padding:0;width:25%;'><b>Giới tính:</b> "+(gender||"□ Nam &nbsp; □ Nữ")+"</td>"+
+    (gv("inpWeight")?"<td style='border:none;padding:0;'><b>Cân nặng:</b> "+gv("inpWeight")+" kg</td>":"<td style='border:none;'></td>")+
+    "</tr></table>"+
     (gv("inpID")?"<div style='margin-bottom:5px;font-size:14px;'><b>Số định danh/CCCD:</b> "+gv("inpID")+"</div>":"")+
     (gv("inpBHYT")?"<div style='margin-bottom:5px;font-size:14px;'><b>Mã số BHYT:</b> "+gv("inpBHYT")+"</div>":"")+
     (gv("inpAddr")?"<div style='margin-bottom:5px;font-size:14px;'><b>Địa chỉ:</b> "+gv("inpAddr")+"</div>":"")+
