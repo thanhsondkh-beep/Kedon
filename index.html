@@ -490,6 +490,7 @@ document.addEventListener("DOMContentLoaded", function() {
   } catch(e) {}
 
   // Render ngay với dữ liệu local
+  fixDrugDisplay();
   renderDrugList(DRUG_DB);
   populateBacsi(BACSI_DB);
   populateLoidan(LOIDAN_DB);
@@ -497,6 +498,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
   // ── Sau đó load từ Firestore (đồng bộ từ máy khác) ──
   loadFromFirestore(function() {
+    fixDrugDisplay();
     renderDrugList(DRUG_DB);
     populateBacsi(BACSI_DB);
     populateLoidan(LOIDAN_DB);
@@ -661,7 +663,7 @@ document.addEventListener("DOMContentLoaded", function() {
     var dvt = document.getElementById("sbAddDvt").value.trim() || "Viên";
     var cd = document.getElementById("sbAddCd").value.trim();
     var p = parseDrugName(ten);
-    var disp = p.nd ? hc+" ("+p.c+") "+p.nd : hc+" ("+p.c+")";
+    var disp = hc && hc !== ten ? (p.nd ? hc+" ("+p.c+") "+p.nd : hc+" ("+p.c+")") : (p.nd ? p.c+" "+p.nd : ten);
     var newDrug = {hoatchat:hc,tenthuoc:ten,tenclean:p.c,nongdo:p.nd,display:disp,dvt:dvt,cachdung:cd};
     DRUG_DB.unshift(newDrug);
     saveDB();
@@ -1074,6 +1076,20 @@ function loadFromFirestore(callback) {
     });
 }
 
+// Chuẩn hóa lại display cho toàn bộ DRUG_DB
+function fixDrugDisplay() {
+  DRUG_DB.forEach(function(d) {
+    var hc = (d.hoatchat || "").trim();
+    var ten = (d.tenthuoc || "").trim();
+    var p = parseDrugName(ten);
+    if (hc && hc !== ten && hc.toLowerCase() !== ten.toLowerCase()) {
+      d.display = p.nd ? hc+" ("+p.c+") "+p.nd : hc+" ("+p.c+")";
+    } else {
+      d.display = p.nd ? p.c+" "+p.nd : ten;
+    }
+  });
+}
+
 // ══════════════════════════════════════════════
 // SIDEBAR
 // ══════════════════════════════════════════════
@@ -1402,7 +1418,7 @@ function importExcel(input, mode) {
           var hc=(r[hcK]||"").toString().trim(), ten=(r[tenK]||"").toString().trim();
           var p=pd(ten);
           return {hoatchat:hc,tenthuoc:ten,tenclean:p.c,nongdo:p.n,
-                  display:p.n?hc+" ("+p.c+") "+p.n:hc+" ("+p.c+")",
+                  display:hc && hc!==ten ? (p.n?hc+" ("+p.c+") "+p.n:hc+" ("+p.c+")") : (p.n?p.c+" "+p.n:ten),
                   dvt:(r[dvtK]||"").toString().trim(), cachdung:(r[cdK]||"").toString().trim()};
         }).filter(function(d){ return d.tenthuoc; });
 
@@ -1513,7 +1529,7 @@ function buildRx(){
     "<div style='font-size:13px;font-weight:700;text-transform:uppercase;text-align:left;margin-bottom:3px;'>"+hosp+"</div>"+
     "<div style='font-size:12px;text-align:left;margin-bottom:2px;'>"+addr+(gv("inpTel")?" — ĐT: "+gv("inpTel"):"")+"</div>"+
     ""+
-    "<div style='text-align:center;font-size:22px;font-weight:700;letter-spacing:3px;margin:8px 0 12px;border-bottom:1px solid #000;padding-bottom:6px;'>ĐƠN THUỐC</div>"+
+    "<div style='text-align:center;font-size:22px;font-weight:700;letter-spacing:3px;margin:8px 0 12px;'>ĐƠN THUỐC</div>"+
     ""+
     // Thông tin bệnh nhân
     "<div style='margin-bottom:5px;font-size:14px;'><b>Họ và tên:</b> "+(gv("inpName")||".....................................................................")+"</div>"+
