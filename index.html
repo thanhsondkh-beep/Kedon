@@ -8,6 +8,7 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <style>
 :root{
   --ink:#1a2332;--ink2:#4a5568;--border:#c8d4e3;
@@ -129,6 +130,33 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
 </style>
 </head>
 <body>
+
+<!-- ══ MÀN HÌNH ĐĂNG NHẬP ══ -->
+<div id="loginScreen" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#1a5fa8 0%,#0d3d6e 100%);z-index:9999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:12px;padding:36px 40px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:28px;margin-bottom:6px;">💊</div>
+      <div style="font-size:17px;font-weight:700;color:#1a2332;font-family:Arial,sans-serif;">Kê Đơn Thuốc</div>
+      <div style="font-size:12px;color:#666;font-family:Arial,sans-serif;margin-top:2px;">BV Đa Khoa Hải Hậu</div>
+    </div>
+    <div id="loginError" style="display:none;background:#fdf2f2;color:#c0392b;border:1px solid #fca5a5;border-radius:6px;padding:8px 12px;font-size:12px;font-family:Arial,sans-serif;margin-bottom:12px;text-align:center;"></div>
+    <div style="margin-bottom:12px;">
+      <label style="display:block;font-size:12px;font-weight:600;color:#1a2332;font-family:Arial,sans-serif;margin-bottom:4px;">Email</label>
+      <input id="loginEmail" type="email" placeholder="email@benhvien.vn" autocomplete="email"
+        style="width:100%;border:1.5px solid #c8d4e3;border-radius:6px;padding:9px 12px;font-size:14px;font-family:Arial,sans-serif;outline:none;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:20px;">
+      <label style="display:block;font-size:12px;font-weight:600;color:#1a2332;font-family:Arial,sans-serif;margin-bottom:4px;">Mật khẩu</label>
+      <input id="loginPass" type="password" placeholder="••••••••" autocomplete="current-password"
+        style="width:100%;border:1.5px solid #c8d4e3;border-radius:6px;padding:9px 12px;font-size:14px;font-family:Arial,sans-serif;outline:none;box-sizing:border-box;">
+    </div>
+    <button id="loginBtn" style="width:100%;background:#1a5fa8;color:#fff;border:none;border-radius:6px;padding:11px;font-size:15px;font-weight:600;font-family:Arial,sans-serif;cursor:pointer;">
+      Đăng nhập
+    </button>
+    <div id="loginLoading" style="display:none;text-align:center;margin-top:12px;font-size:13px;color:#666;font-family:Arial,sans-serif;">⏳ Đang xác thực...</div>
+  </div>
+</div>
+
 <div class="app">
 
 <!-- SIDEBAR -->
@@ -231,6 +259,10 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
       <div style="font-size:10px;color:var(--ink2);font-family:Arial,sans-serif;">Theo mẫu Thông tư 26/2025/TT-BYT</div>
     </div>
     <button class="btn btn-d" id="btnNew">🗑 Đơn mới</button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
+      <span id="userEmailDisplay" style="font-size:12px;color:var(--ink2);font-family:Arial,sans-serif;"></span>
+      <button id="btnLogout" class="btn" style="background:#e8f0fb;color:var(--blue);border:1px solid #c8d4e3;padding:5px 10px;font-size:12px;">🚪 Đăng xuất</button>
+    </div>
   </div>
   <!-- Trạng thái đồng bộ Firebase -->
   <div id="syncStatus" style="display:none;align-items:center;gap:6px;padding:5px 10px;border-radius:4px;font-size:12px;font-family:Arial,sans-serif;margin-bottom:10px;"></div>
@@ -503,7 +535,22 @@ var SHORTCUT_DB = [
 // ══════════════════════════════════════════════
 // KHỞI TẠO
 // ══════════════════════════════════════════════
+// Login screen bindings (chạy ngay khi DOM ready)
 document.addEventListener("DOMContentLoaded", function() {
+  // Ẩn app, hiện login screen ban đầu
+  document.querySelector(".app").style.display = "none";
+
+  // Đăng nhập
+  document.getElementById("loginBtn").addEventListener("click", doLogin);
+  document.getElementById("loginPass").addEventListener("keydown", function(e){
+    if(e.key==="Enter") doLogin();
+  });
+  document.getElementById("loginEmail").addEventListener("keydown", function(e){
+    if(e.key==="Enter") document.getElementById("loginPass").focus();
+  });
+});
+
+function initApp() {
   document.getElementById("inpDate").value = new Date().toISOString().split("T")[0];
 
   // ── Load từ localStorage trước (hiển thị ngay, không chờ mạng) ──
@@ -936,7 +983,15 @@ document.addEventListener("DOMContentLoaded", function() {
   // Đóng dropdown khi click ra ngoài
   document.addEventListener("click", function(e){
   });
-});
+
+  // ── Đăng xuất ──
+  document.getElementById("btnLogout").addEventListener("click", function(){
+    if (!confirm("Bạn có muốn đăng xuất không?")) return;
+    auth.signOut().then(function(){
+      _appReady = false;
+    });
+  });
+}
 
 // ══════════════════════════════════════════════
 // QUẢN LÝ DANH MỤC
@@ -1089,9 +1144,59 @@ var firebaseConfig = {
   appId: "1:410560226012:web:7824fa8451f64a41b1ca19"
 };
 firebase.initializeApp(firebaseConfig);
-var db = firebase.firestore();
+var db   = firebase.firestore();
+var auth = firebase.auth();
 var DRUG_COLLECTION = "drug_catalog";
 var META_DOC = "meta";
+
+// ══════════════════════════════════════════════
+// AUTHENTICATION
+// ══════════════════════════════════════════════
+var _appReady = false;
+
+function showLogin() {
+  document.getElementById("loginScreen").style.display = "flex";
+  document.querySelector(".app").style.display = "none";
+  setTimeout(function(){ document.getElementById("loginEmail").focus(); }, 100);
+}
+
+function showApp(user) {
+  document.getElementById("loginScreen").style.display = "none";
+  document.querySelector(".app").style.display = "flex";
+  var emailEl = document.getElementById("userEmailDisplay");
+  if (emailEl) emailEl.textContent = user.email;
+}
+
+auth.onAuthStateChanged(function(user) {
+  if (user) {
+    showApp(user);
+    if (!_appReady) { _appReady = true; initApp(); }
+  } else {
+    showLogin();
+  }
+});
+
+function doLogin() {
+  var email = (document.getElementById("loginEmail").value || "").trim();
+  var pass  = document.getElementById("loginPass").value || "";
+  var errEl = document.getElementById("loginError");
+  var loadEl= document.getElementById("loginLoading");
+  errEl.style.display = "none";
+  if (!email || !pass) { errEl.textContent = "Vui lòng nhập email và mật khẩu."; errEl.style.display = "block"; return; }
+  loadEl.style.display = "block";
+  document.getElementById("loginBtn").disabled = true;
+  auth.signInWithEmailAndPassword(email, pass)
+    .then(function(){ loadEl.style.display="none"; })
+    .catch(function(err){
+      loadEl.style.display="none";
+      document.getElementById("loginBtn").disabled=false;
+      var msg="Đăng nhập thất bại.";
+      if(err.code==="auth/user-not-found"||err.code==="auth/wrong-password"||err.code==="auth/invalid-credential") msg="Email hoặc mật khẩu không đúng.";
+      else if(err.code==="auth/too-many-requests") msg="Quá nhiều lần thử. Vui lòng thử lại sau.";
+      else if(err.code==="auth/invalid-email") msg="Email không hợp lệ.";
+      errEl.textContent=msg; errEl.style.display="block";
+    });
+}
 
 // ══════════════════════════════════════════════
 // LƯU / KHÔI PHỤC TOÀN BỘ DANH MỤC
