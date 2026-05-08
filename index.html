@@ -11,6 +11,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <style>
 .app-hidden{display:none!important;}
+/* admin-only: ẩn/hiện bằng JS */
 :root{
   --ink:#1a2332;--ink2:#4a5568;--border:#c8d4e3;
   --bg:#eef2f8;--white:#fff;
@@ -165,7 +166,7 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
   </div>
   <div class="sb-tabs">
     <button class="sb-tab active" id="tabView">📋 Tra cứu</button>
-    <button class="sb-tab" id="tabManageDrug">⚙ Quản lý</button>
+    <button class="sb-tab admin-only" id="tabManageDrug">⚙ Quản lý</button>
   </div>
 
   <!-- ── PANEL TRA CỨU ── -->
@@ -177,8 +178,8 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
 
   <!-- ── PANEL QUẢN LÝ ── -->
   <div id="panelManageDrug" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
-    <!-- Thêm thuốc mới -->
-    <div style="padding:10px 12px;border-bottom:1px solid var(--border);background:#f9fbfd;">
+    <!-- Thêm thuốc mới (admin only) -->
+    <div id="addDrugForm" class="admin-only" style="padding:10px 12px;border-bottom:1px solid var(--border);background:#f9fbfd;">
       <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px;font-family:Arial,sans-serif;">＋ Thêm thuốc mới</div>
       <div style="display:flex;flex-direction:column;gap:5px;">
         <input id="sbAddHc" placeholder="Hoạt chất..." style="border:1px solid var(--border);border-radius:4px;padding:5px 8px;font-size:13px;font-family:'Times New Roman',serif;outline:none;width:100%;">
@@ -204,14 +205,12 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
       </div>
     </div>
     <div id="mgDrugList" style="flex:1;overflow-y:auto;"></div>
-    <!-- Chia sẻ danh mục JSON -->
-    <div style="padding:9px 12px;border-top:2px solid var(--border);background:#f0f7ff;">
+    <!-- Chia sẻ danh mục JSON (admin only) -->
+    <div class="admin-only" style="padding:9px 12px;border-top:2px solid var(--border);background:#f0f7ff;">
       <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:7px;font-family:Arial,sans-serif;">🔄 Chia sẻ danh mục giữa các máy</div>
-      <!-- Xuất -->
       <button id="btnExportJson" style="width:100%;background:var(--blue);color:#fff;border:none;border-radius:4px;padding:8px;font-size:13px;font-family:Arial,sans-serif;cursor:pointer;font-weight:600;margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:6px;">
         📤 Xuất danh mục ra file
       </button>
-      <!-- Nhập -->
       <div style="display:flex;gap:5px;">
         <label for="jsonReplace" style="flex:1;display:flex;align-items:center;justify-content:center;padding:7px 5px;background:var(--red);color:#fff;border-radius:4px;cursor:pointer;font-size:12px;font-family:Arial,sans-serif;font-weight:600;text-align:center;line-height:1.4;">
           📥 Nhập &amp; thay thế<br><span style="font-weight:400;font-size:10px;">xóa cũ, dùng file mới</span>
@@ -227,8 +226,8 @@ body{font-family:"Times New Roman",serif;background:var(--bg);color:var(--ink);f
       </div>
     </div>
 
-    <!-- Import Excel -->
-    <div style="padding:9px 12px;border-top:2px solid var(--border);background:#f9fbfd;">
+    <!-- Import Excel (admin only) -->
+    <div class="admin-only" style="padding:9px 12px;border-top:2px solid var(--border);background:#f9fbfd;">
       <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:7px;font-family:Arial,sans-serif;">📥 Cập nhật từ file Excel</div>
       <div style="display:flex;gap:6px;">
         <label for="fileReplace" style="flex:1;display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 6px;background:var(--red);color:#fff;border-radius:4px;cursor:pointer;font-size:12px;font-family:Arial,sans-serif;font-weight:600;text-align:center;line-height:1.3;">
@@ -534,6 +533,7 @@ var SHORTCUT_DB = [
 // ══════════════════════════════════════════════
 // Login bindings - chạy ngay khi DOM ready
 document.addEventListener("DOMContentLoaded", function() {
+  initAdminElements(); // ẩn admin-only elements trước khi Firebase check
   document.getElementById("loginScreen").style.display = "none";
   document.getElementById("loginBtn").addEventListener("click", doLogin);
   document.getElementById("loginPass").addEventListener("keydown", function(e){ if(e.key==="Enter") doLogin(); });
@@ -729,6 +729,7 @@ function initApp() {
 
   // ── Thêm thuốc vào danh mục trực tiếp từ sidebar ──
   function sbAddDrug() {
+    if (!isAdmin()) { showToast("⛔ Bạn không có quyền thêm thuốc"); return; }
     var hc = document.getElementById("sbAddHc").value.trim();
     var ten = document.getElementById("sbAddTen").value.trim();
     if (!ten) { document.getElementById("sbAddTen").focus(); return; }
@@ -1139,6 +1140,9 @@ var auth = firebase.auth();
 // AUTHENTICATION
 // ══════════════════════════════════════════════
 var _appReady = false;
+var CURRENT_USER = null;
+var ADMIN_EMAILS = ["thanhsondkh@gmail.com", "luthi8332@gmail.com"];
+function isAdmin() { return CURRENT_USER && ADMIN_EMAILS.indexOf(CURRENT_USER.email.toLowerCase()) >= 0; }
 
 function showLogin() {
   document.getElementById("loginScreen").style.display = "flex";
@@ -1146,6 +1150,41 @@ function showLogin() {
   appEl.style.display = "none";
   appEl.classList.add("app-hidden");
   setTimeout(function(){ document.getElementById("loginEmail").focus(); }, 100);
+}
+
+function applyPermissions() {
+  var admin = isAdmin();
+  document.querySelectorAll(".admin-only").forEach(function(el) {
+    if (admin) {
+      // Khôi phục display gốc đã lưu, hoặc xóa inline style
+      var orig = el.getAttribute("data-display") || "";
+      el.style.display = orig;
+    } else {
+      el.style.display = "none";
+    }
+  });
+}
+
+// Lưu display gốc của admin-only elements trước khi ẩn
+function initAdminElements() {
+  document.querySelectorAll(".admin-only").forEach(function(el) {
+    // Lưu giá trị display hiện tại (trước khi CSS ẩn)
+    var computed = window.getComputedStyle(el).display;
+    if (computed && computed !== "none") {
+      el.setAttribute("data-display", computed);
+    } else {
+      // Đoán theo tag
+      var tag = el.tagName.toLowerCase();
+      if (tag === "button" || tag === "span" || tag === "a") {
+        el.setAttribute("data-display", "inline-block");
+      } else if (tag === "div" || tag === "section") {
+        el.setAttribute("data-display", "block");
+      } else {
+        el.setAttribute("data-display", "block");
+      }
+    }
+    el.style.display = "none"; // ẩn mặc định
+  });
 }
 
 function showApp(user) {
@@ -1159,9 +1198,11 @@ function showApp(user) {
 
 auth.onAuthStateChanged(function(user) {
   if (user) {
+    CURRENT_USER = user;
     showApp(user);
-    if (!_appReady) { _appReady = true; initApp(); }
+    if (!_appReady) { _appReady = true; initApp(); setTimeout(applyPermissions, 100); }
   } else {
+    CURRENT_USER = null;
     showLogin();
   }
 });
@@ -1384,6 +1425,7 @@ function renderMgDrugList(q) {
     // Nút khóa / mở khóa
     var btnLock = document.createElement("button");
     btnLock.className = "btn-lock" + (isLocked ? " locked-state" : "");
+    if (!isAdmin()) { btnLock.style.display="none"; }
     btnLock.textContent = isLocked ? "🔓 Mở" : "🔒 Khóa";
     btnLock.title = isLocked ? "Mở khóa — cho phép kê đơn trở lại" : "Khóa — ẩn khỏi danh sách kê đơn";
     btnLock.addEventListener("click", function() {
@@ -1434,6 +1476,7 @@ function renderMgDrugList(q) {
     btnSave.textContent = "💾";
     btnSave.title = "Lưu cách dùng";
     btnSave.style.cssText = "background:var(--blue);color:#fff;border:none;border-radius:4px;padding:4px 8px;cursor:pointer;font-size:13px;flex-shrink:0;";
+    if (!isAdmin()) { btnSave.style.display="none"; cdInp.readOnly=true; cdInp.style.background="#f4f7fb"; }
     btnSave.addEventListener("click", function() {
       d.cachdung = cdInp.value.trim();
       saveDB();
