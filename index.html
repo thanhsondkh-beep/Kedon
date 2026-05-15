@@ -1001,9 +1001,11 @@ function renderMgBacsi() {
     var row = document.createElement("div"); row.className="mg-row";
     row.innerHTML = "<span>"+b.ten+"</span><span class='mg-sdt'>"+( b.sdt||"" )+"</span>";
     var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
+    if (!isAdmin()) btn.style.display = "none";
     btn.addEventListener("click", function(){
       if(!confirm("Xóa bác sĩ: "+b.ten+"?")) return;
-      BACSI_DB.splice(i,1); populateBacsi(BACSI_DB); renderMgBacsi(); saveDB();
+      var ri=BACSI_DB.indexOf(b); if(ri>=0) BACSI_DB.splice(ri,1);
+      populateBacsi(BACSI_DB); renderMgBacsi(); saveDB();
     });
     row.appendChild(btn); list.appendChild(row);
   });
@@ -1016,8 +1018,10 @@ function renderMgLoidan() {
     var row = document.createElement("div"); row.className="mg-row";
     var sp = document.createElement("span"); sp.textContent = ld; sp.style.fontSize="12px";
     var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
+    if (!isAdmin()) btn.style.display = "none";
     btn.addEventListener("click", function(){
-      LOIDAN_DB.splice(i,1); populateLoidan(LOIDAN_DB); renderMgLoidan(); saveDB();
+      var ri=LOIDAN_DB.indexOf(ld); if(ri>=0) LOIDAN_DB.splice(ri,1);
+      populateLoidan(LOIDAN_DB); renderMgLoidan(); saveDB();
     });
     row.appendChild(sp); row.appendChild(btn); list.appendChild(row);
   });
@@ -1042,8 +1046,10 @@ function renderMgShortcut() {
     full.style.cssText = "flex:1;font-size:13px;";
     full.textContent = s.full;
     var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
+    if (!isAdmin()) btn.style.display = "none";
     btn.addEventListener("click", function(){
-      SHORTCUT_DB.splice(i,1); saveDB(); renderMgShortcut();
+      var ri=SHORTCUT_DB.indexOf(s); if(ri>=0) SHORTCUT_DB.splice(ri,1);
+      saveDB(); renderMgShortcut();
     });
     row.appendChild(keyTag); row.appendChild(arrow); row.appendChild(full); row.appendChild(btn);
     list.appendChild(row);
@@ -1077,8 +1083,10 @@ function renderMgAddr() {
     var row = document.createElement("div"); row.className="mg-row";
     var sp = document.createElement("span"); sp.textContent = a; sp.style.fontSize="12px";
     var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
+    if (!isAdmin()) btn.style.display = "none";
     btn.addEventListener("click", function(){
-      ADDR_DB.splice(i,1); populateAddrList(); saveDB(); renderMgAddr();
+      var ri=ADDR_DB.indexOf(a); if(ri>=0) ADDR_DB.splice(ri,1);
+      populateAddrList(); saveDB(); renderMgAddr();
     });
     row.appendChild(sp); row.appendChild(btn); list.appendChild(row);
   });
@@ -1091,9 +1099,10 @@ function renderMgBenh() {
     var row = document.createElement("div"); row.className="mg-row";
     var sp = document.createElement("span"); sp.textContent = b;
     var btn = document.createElement("button"); btn.className="mg-del"; btn.textContent="✕"; btn.title="Xóa";
+    if (!isAdmin()) btn.style.display = "none";
     btn.addEventListener("click", function(){
-      BENH_DB.splice(i,1); renderMgBenh(); saveDB();
-      showToast("Đã xóa: "+b);
+      var ri=BENH_DB.indexOf(b); if(ri>=0) BENH_DB.splice(ri,1);
+      renderMgBenh(); saveDB(); showToast("Đã xóa: "+b);
     });
     row.appendChild(sp); row.appendChild(btn); list.appendChild(row);
   });
@@ -1304,9 +1313,6 @@ function loadFromFirestore(callback) {
           localStorage.setItem("bvhh_tpl_db",    JSON.stringify(TEMPLATE_DB));
           localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
           localStorage.setItem("bvhh_sc_db",     JSON.stringify(SHORTCUT_DB));
-    localStorage.setItem("bvhh_sc_db",     JSON.stringify(SHORTCUT_DB));
-    localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
-    localStorage.setItem("bvhh_sc_db",     JSON.stringify(SHORTCUT_DB));
         } catch(e) {}
         setSyncStatus("ok", "✅ Đã tải dữ liệu từ cloud");
         if (!doc.data().drugs || !doc.data().drugs.length) {
@@ -2101,9 +2107,11 @@ function renderTemplateList(q) {
     var btnDel = document.createElement("button");
     btnDel.style.cssText = "background:none;border:none;color:var(--red);cursor:pointer;font-size:16px;padding:0 3px;";
     btnDel.textContent = "✕"; btnDel.title = "Xóa đơn mẫu này";
+    if (!isAdmin()) btnDel.style.display = "none";
     btnDel.addEventListener("click", function() {
       if (!confirm("Xóa đơn mẫu: " + tpl.name + "?")) return;
-      TEMPLATE_DB.splice(idx, 1);
+      var realIdx = TEMPLATE_DB.indexOf(tpl);
+      if (realIdx >= 0) TEMPLATE_DB.splice(realIdx, 1);
       saveDB(); renderTemplateList((document.getElementById("tplSearch")||{}).value||"");
       showToast("Đã xóa đơn mẫu: " + tpl.name);
     });
