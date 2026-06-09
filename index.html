@@ -1202,14 +1202,14 @@ function showApp(user) {
   appEl.classList.remove("app-hidden");
   appEl.style.display = "flex";
   var emailEl = document.getElementById("userEmailDisplay");
-  if (emailEl) emailEl.textContent = user.email;
+  if (emailEl) emailEl.textContent = user.email + (isAdmin() ? " (Admin)" : " (Bác sĩ)");
 }
 
 auth.onAuthStateChanged(function(user) {
   if (user) {
     CURRENT_USER = user;
     showApp(user);
-    if (!_appReady) { _appReady = true; initApp(); setTimeout(applyPermissions, 100); }
+    if (!_appReady) { _appReady = true; initApp(); applyPermissions(); }
   } else {
     CURRENT_USER = null;
     showLogin();
@@ -1244,8 +1244,13 @@ var META_DOC = "meta";
 // LƯU / KHÔI PHỤC TOÀN BỘ DANH MỤC
 // ══════════════════════════════════════════════
 var saveTimeout = null;
-function saveDB() {
-  // Lưu localStorage ngay lập tức (cache offline)
+var _isSavingToFirestore = false;
+// ID duy nhất cho tab này - dùng để phân biệt ai đang save
+var _machineId = localStorage.getItem("bvhh_machine_id");
+if (!_machineId) { _machineId = "m_" + Date.now() + "_" + Math.random().toString(36).substr(2,6); localStorage.setItem("bvhh_machine_id", _machineId); }
+var _pendingSave = false; // có data chưa được lưu lên Firestore
+
+function saveLocalStorage() {
   try {
     localStorage.setItem("bvhh_drug_db",   JSON.stringify(DRUG_DB));
     localStorage.setItem("bvhh_bacsi_db",  JSON.stringify(BACSI_DB));
@@ -1254,10 +1259,17 @@ function saveDB() {
     localStorage.setItem("bvhh_tpl_db",    JSON.stringify(TEMPLATE_DB));
     localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
     localStorage.setItem("bvhh_sc_db",     JSON.stringify(SHORTCUT_DB));
+    localStorage.setItem("bvhh_updated",   String(Date.now()));
   } catch(e) {}
-  // Lưu Firestore debounce 800ms
+}
+
+function saveDB() {
+  // Lưu localStorage ngay lập tức
+  saveLocalStorage();
+  _pendingSave = true;
+  // Lưu Firestore debounce 300ms
   clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(function() { saveToFirestore(); }, 800);
+  saveTimeout = setTimeout(function() { saveToFirestore(); }, 300);
 }
 
 function setSyncStatus(state, msg) {
@@ -1276,6 +1288,8 @@ function setSyncStatus(state, msg) {
 }
 
 function saveToFirestore() {
+  _isSavingToFirestore = true;
+  var ts = Date.now();
   setSyncStatus("syncing", "🔄 Đang đồng bộ...");
   db.collection(DRUG_COLLECTION).doc(META_DOC).set({
     drugs:   DRUG_DB,
@@ -1285,38 +1299,69 @@ function saveToFirestore() {
     templates: TEMPLATE_DB,
     addresses: ADDR_DB,
     shortcuts: SHORTCUT_DB,
-    updatedAt: Date.now()
+    updatedAt: ts,
+    savedBy:   _machineId
   })
-  .then(function() { setSyncStatus("ok", "✅ Đã đồng bộ lên cloud"); })
-  .catch(function(err) { setSyncStatus("error", "⚠ Lỗi đồng bộ: " + err.message); });
+  .then(function() {
+    _isSavingToFirestore = false;
+    _pendingSave = false;
+    localStorage.setItem("bvhh_firestore_ts", String(ts));
+    setSyncStatus("ok", "✅ Đã đồng bộ lên cloud");
+  })
+  .catch(function(err) {
+    _isSavingToFirestore = false;
+    var msg = err.message;
+    if (err.code === "permission-denied") msg = "Không có quyền ghi — kiểm tra Firestore Rules";
+    setSyncStatus("error", "⚠ Lỗi lưu: " + msg);
+  });
 }
 
 function loadFromFirestore(callback) {
+  // Nếu đang save hoặc có pending save → ưu tiên data local
+  if (_isSavingToFirestore || _pendingSave) {
+    setSyncStatus("syncing", "🔄 Đang lưu dữ liệu...");
+    // Thử lại sau khi save xong
+    var retryCount = 0;
+    var retry = setInterval(function() {
+      retryCount++;
+      if (!_isSavingToFirestore && !_pendingSave) {
+        clearInterval(retry);
+        if (callback) callback();
+      }
+      if (retryCount > 20) { clearInterval(retry); if (callback) callback(); }
+    }, 200);
+    return;
+  }
   setSyncStatus("syncing", "🔄 Đang tải dữ liệu từ cloud...");
   db.collection(DRUG_COLLECTION).doc(META_DOC).get()
     .then(function(doc) {
       if (doc.exists) {
         var data = doc.data();
-        if (data.drugs  && data.drugs.length  > 0) DRUG_DB    = data.drugs;
-        if (data.bacsi  && data.bacsi.length  > 0) BACSI_DB   = data.bacsi;
-        if (data.loidan && data.loidan.length > 0) LOIDAN_DB  = data.loidan;
-        if (data.benh   && data.benh.length   > 0) BENH_DB    = data.benh;
-        if (data.templates && data.templates.length > 0) TEMPLATE_DB = data.templates;
-        if (data.addresses && data.addresses.length > 0) ADDR_DB = data.addresses;
-        if (data.shortcuts) SHORTCUT_DB = data.shortcuts;
-        // Cập nhật cache localStorage
-        try {
-          localStorage.setItem("bvhh_drug_db",   JSON.stringify(DRUG_DB));
-          localStorage.setItem("bvhh_bacsi_db",  JSON.stringify(BACSI_DB));
-          localStorage.setItem("bvhh_loidan_db", JSON.stringify(LOIDAN_DB));
-          localStorage.setItem("bvhh_benh_db",   JSON.stringify(BENH_DB));
-          localStorage.setItem("bvhh_tpl_db",    JSON.stringify(TEMPLATE_DB));
-          localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
-          localStorage.setItem("bvhh_sc_db",     JSON.stringify(SHORTCUT_DB));
-        } catch(e) {}
-        setSyncStatus("ok", "✅ Đã tải dữ liệu từ cloud");
-        if (!doc.data().drugs || !doc.data().drugs.length) {
-          saveToFirestore(); // Lần đầu: đẩy data mặc định lên
+        var cloudTs  = data.updatedAt || 0;
+        var savedBy  = data.savedBy || "";
+        var firestoreTs = parseInt(localStorage.getItem("bvhh_firestore_ts") || "0", 10);
+
+        // Nếu cloud có data mới hơn lần sync cuối của máy này → load
+        // Nếu chính máy này vừa save (savedBy === _machineId) → không cần load lại
+        if (savedBy !== _machineId && cloudTs > firestoreTs) {
+          // Máy khác vừa cập nhật → load về
+          if (data.drugs     && data.drugs.length     > 0) DRUG_DB     = data.drugs;
+          if (data.bacsi     && data.bacsi.length     > 0) BACSI_DB    = data.bacsi;
+          if (data.loidan    && data.loidan.length    > 0) LOIDAN_DB   = data.loidan;
+          if (data.benh      && data.benh.length      > 0) BENH_DB     = data.benh;
+          if (data.templates && data.templates.length > 0) TEMPLATE_DB = data.templates;
+          if (data.addresses && data.addresses.length > 0) ADDR_DB     = data.addresses;
+          if (data.shortcuts) SHORTCUT_DB = data.shortcuts;
+          saveLocalStorage();
+          localStorage.setItem("bvhh_firestore_ts", String(cloudTs));
+          setSyncStatus("ok", "✅ Đã tải dữ liệu từ cloud");
+        } else if (savedBy === _machineId || cloudTs <= firestoreTs) {
+          // Chính máy này vừa save hoặc cloud cũ hơn → giữ data local
+          setSyncStatus("ok", "✅ Dữ liệu đã đồng bộ");
+          // Nếu cloud chưa có gì → đẩy lên
+          if (!data.drugs || !data.drugs.length) saveToFirestore();
+        } else {
+          setSyncStatus("ok", "✅ Dữ liệu đã đồng bộ");
         }
       } else {
         setSyncStatus("syncing", "🔄 Khởi tạo dữ liệu lên cloud...");
@@ -2193,18 +2238,47 @@ function initTemplateModal() {
     if (!name) { document.getElementById("tplName").focus(); return; }
     var data = getCurrentRxData();
     if (!data.drugs.length) { showToast("⚠ Chưa có thuốc!"); return; }
-    // Kiểm tra trùng tên
-    var existing = TEMPLATE_DB.findIndex(function(t){ return t.name === name; });
     var tpl = { name: name, chandoan: data.chandoan, loidan: data.loidan, drugs: data.drugs, savedAt: Date.now() };
-    if (existing >= 0) {
-      if (!confirm("Đã có đơn mẫu tên '" + name + "'. Ghi đè?")) return;
-      TEMPLATE_DB[existing] = tpl;
-    } else {
-      TEMPLATE_DB.push(tpl);
-    }
-    saveDB();
-    document.getElementById("tplModal").style.display = "none";
-    showToast("✓ Đã lưu đơn mẫu: " + name);
+
+    // Đọc Firestore trước để merge, tránh ghi đè đơn mẫu của bác sĩ khác
+    setSyncStatus("syncing", "🔄 Đang lưu đơn mẫu...");
+    db.collection(DRUG_COLLECTION).doc(META_DOC).get().then(function(doc) {
+      var mergedTemplates = TEMPLATE_DB.slice(); // copy local
+      if (doc.exists && doc.data().templates && doc.data().templates.length > 0) {
+        var cloudTpls = doc.data().templates;
+        // Merge: với mỗi đơn trên cloud mà local không có (theo tên) → thêm vào
+        cloudTpls.forEach(function(ct) {
+          var inLocal = mergedTemplates.findIndex(function(lt){ return lt.name === ct.name; });
+          if (inLocal < 0) mergedTemplates.push(ct); // đơn của bác sĩ khác → giữ lại
+        });
+      }
+      // Thêm/ghi đè đơn hiện tại
+      var existing = mergedTemplates.findIndex(function(t){ return t.name === name; });
+      if (existing >= 0) {
+        if (!confirm("Đã có đơn mẫu tên '" + name + "'. Ghi đè?")) {
+          setSyncStatus("ok", ""); return;
+        }
+        mergedTemplates[existing] = tpl;
+      } else {
+        mergedTemplates.push(tpl);
+      }
+      TEMPLATE_DB = mergedTemplates;
+      saveDB();
+      document.getElementById("tplModal").style.display = "none";
+      showToast("✓ Đã lưu đơn mẫu: " + name);
+    }).catch(function() {
+      // Nếu không đọc được cloud → lưu local như cũ
+      var existing = TEMPLATE_DB.findIndex(function(t){ return t.name === name; });
+      if (existing >= 0) {
+        if (!confirm("Đã có đơn mẫu tên '" + name + "'. Ghi đè?")) return;
+        TEMPLATE_DB[existing] = tpl;
+      } else {
+        TEMPLATE_DB.push(tpl);
+      }
+      saveDB();
+      document.getElementById("tplModal").style.display = "none";
+      showToast("✓ Đã lưu đơn mẫu: " + name);
+    });
   });
 
   // Enter trong ô tên đơn mẫu → lưu
