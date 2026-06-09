@@ -868,9 +868,25 @@ function initApp() {
     var name = document.getElementById("mgBsName").value.trim();
     if (!name) return;
     var sdt = document.getElementById("mgBsSdt").value.trim();
-    BACSI_DB.push({ten:name, sdt:sdt});
-    populateBacsi(BACSI_DB); renderMgBacsi();
-    saveDB();
+    var newBs = {ten:name, sdt:sdt};
+    // Merge với Firestore trước khi lưu
+    db.collection(DRUG_COLLECTION).doc(META_DOC).get().then(function(doc) {
+      if (doc.exists && doc.data().bacsi && doc.data().bacsi.length > 0) {
+        var cloudBs = doc.data().bacsi;
+        // Thêm những bác sĩ trên cloud mà local chưa có
+        cloudBs.forEach(function(cb) {
+          var inLocal = BACSI_DB.findIndex(function(lb){ return lb.ten === cb.ten && lb.sdt === cb.sdt; });
+          if (inLocal < 0) BACSI_DB.push(cb);
+        });
+      }
+      BACSI_DB.push(newBs);
+      populateBacsi(BACSI_DB); renderMgBacsi();
+      saveDB();
+    }).catch(function() {
+      BACSI_DB.push(newBs);
+      populateBacsi(BACSI_DB); renderMgBacsi();
+      saveDB();
+    });
     document.getElementById("mgBsName").value=""; document.getElementById("mgBsSdt").value="";
     document.getElementById("mgBsName").focus();
     showToast("✓ Đã thêm bác sĩ: "+name);
@@ -881,8 +897,21 @@ function initApp() {
   document.getElementById("mgLdAdd").addEventListener("click", function(){
     var v = document.getElementById("mgLdText").value.trim();
     if (!v) return;
-    LOIDAN_DB.push(v); populateLoidan(LOIDAN_DB); renderMgLoidan();
-    saveDB();
+    // Merge với Firestore trước khi lưu
+    db.collection(DRUG_COLLECTION).doc(META_DOC).get().then(function(doc) {
+      if (doc.exists && doc.data().loidan && doc.data().loidan.length > 0) {
+        var cloudLd = doc.data().loidan;
+        cloudLd.forEach(function(cl) {
+          if (LOIDAN_DB.indexOf(cl) < 0) LOIDAN_DB.push(cl);
+        });
+      }
+      if (LOIDAN_DB.indexOf(v) < 0) LOIDAN_DB.push(v);
+      populateLoidan(LOIDAN_DB); renderMgLoidan();
+      saveDB();
+    }).catch(function() {
+      LOIDAN_DB.push(v); populateLoidan(LOIDAN_DB); renderMgLoidan();
+      saveDB();
+    });
     document.getElementById("mgLdText").value=""; document.getElementById("mgLdText").focus();
     showToast("✓ Đã thêm lời dặn");
   });
