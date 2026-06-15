@@ -2134,11 +2134,29 @@ function openLoadTemplate() {
 // Render danh sách đơn mẫu
 function renderTemplateList(q) {
   var wrap = document.getElementById("tplList");
-  var list = q ? TEMPLATE_DB.filter(function(t){
-    return t.name.toLowerCase().includes(q) ||
-           (t.chandoan||"").toLowerCase().includes(q) ||
-           t.drugs.some(function(d){ return d.name.toLowerCase().includes(q); });
-  }) : TEMPLATE_DB;
+  var list;
+  if (q) {
+    // Lọc và sắp xếp theo độ khớp
+    list = TEMPLATE_DB.filter(function(t){
+      return t.name.toLowerCase().includes(q) ||
+             (t.chandoan||"").toLowerCase().includes(q) ||
+             t.drugs.some(function(d){ return d.name.toLowerCase().includes(q); });
+    });
+    // Sắp xếp: tên khớp đầu chuỗi > tên chứa từ khóa > chẩn đoán khớp > thuốc khớp
+    list.sort(function(a, b) {
+      function score(t) {
+        var n = t.name.toLowerCase();
+        var cd = (t.chandoan||"").toLowerCase();
+        if (n.startsWith(q)) return 0;
+        if (n.includes(q)) return 1;
+        if (cd.includes(q)) return 2;
+        return 3;
+      }
+      return score(a) - score(b);
+    });
+  } else {
+    list = TEMPLATE_DB;
+  }
 
   if (!list.length) {
     wrap.innerHTML = "<div style='padding:20px;text-align:center;color:#aaa;font-size:13px;font-family:Arial,sans-serif;'>" +
@@ -2146,7 +2164,7 @@ function renderTemplateList(q) {
     return;
   }
   wrap.innerHTML = "";
-  TEMPLATE_DB.forEach(function(tpl, idx) {
+  list.forEach(function(tpl) {
     var warnings = checkTemplateWarnings(tpl);
     var hasWarn = warnings.length > 0;
     var item = document.createElement("div");
