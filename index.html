@@ -1273,11 +1273,7 @@ var META_DOC = "meta";
 // LƯU / KHÔI PHỤC TOÀN BỘ DANH MỤC
 // ══════════════════════════════════════════════
 var saveTimeout = null;
-var _isSavingToFirestore = false;
-// ID duy nhất cho tab này - dùng để phân biệt ai đang save
-var _machineId = localStorage.getItem("bvhh_machine_id");
-if (!_machineId) { _machineId = "m_" + Date.now() + "_" + Math.random().toString(36).substr(2,6); localStorage.setItem("bvhh_machine_id", _machineId); }
-var _pendingSave = false; // có data chưa được lưu lên Firestore
+var _isSaving = false;
 
 function saveLocalStorage() {
   try {
@@ -1288,17 +1284,13 @@ function saveLocalStorage() {
     localStorage.setItem("bvhh_tpl_db",    JSON.stringify(TEMPLATE_DB));
     localStorage.setItem("bvhh_addr_db",   JSON.stringify(ADDR_DB));
     localStorage.setItem("bvhh_sc_db",     JSON.stringify(SHORTCUT_DB));
-    localStorage.setItem("bvhh_updated",   String(Date.now()));
   } catch(e) {}
 }
 
 function saveDB() {
-  // Lưu localStorage ngay lập tức
-  saveLocalStorage();
-  _pendingSave = true;
-  // Lưu Firestore debounce 300ms
+  saveLocalStorage(); // lưu localStorage ngay lập tức
   clearTimeout(saveTimeout);
-  saveTimeout = setTimeout(function() { saveToFirestore(); }, 300);
+  saveTimeout = setTimeout(function() { saveToFirestore(); }, 500);
 }
 
 function setSyncStatus(state, msg) {
@@ -1317,88 +1309,60 @@ function setSyncStatus(state, msg) {
 }
 
 function saveToFirestore() {
-  _isSavingToFirestore = true;
-  var ts = Date.now();
+  if (_isSaving) return;
+  _isSaving = true;
   setSyncStatus("syncing", "🔄 Đang đồng bộ...");
   db.collection(DRUG_COLLECTION).doc(META_DOC).set({
-    drugs:   DRUG_DB,
-    bacsi:   BACSI_DB,
-    loidan:  LOIDAN_DB,
-    benh:    BENH_DB,
+    drugs:     DRUG_DB,
+    bacsi:     BACSI_DB,
+    loidan:    LOIDAN_DB,
+    benh:      BENH_DB,
     templates: TEMPLATE_DB,
     addresses: ADDR_DB,
     shortcuts: SHORTCUT_DB,
-    updatedAt: ts,
-    savedBy:   _machineId
+    updatedAt: Date.now()
   })
   .then(function() {
-    _isSavingToFirestore = false;
-    _pendingSave = false;
-    localStorage.setItem("bvhh_firestore_ts", String(ts));
+    _isSaving = false;
     setSyncStatus("ok", "✅ Đã đồng bộ lên cloud");
   })
   .catch(function(err) {
-    _isSavingToFirestore = false;
+    _isSaving = false;
     var msg = err.message;
     if (err.code === "permission-denied") msg = "Không có quyền ghi — kiểm tra Firestore Rules";
     setSyncStatus("error", "⚠ Lỗi lưu: " + msg);
+    // Thử lại sau 3 giây nếu lỗi mạng
+    if (err.code !== "permission-denied") {
+      setTimeout(function(){ saveToFirestore(); }, 3000);
+    }
   });
 }
 
 function loadFromFirestore(callback) {
-  // Nếu đang save hoặc có pending save → ưu tiên data local
-  if (_isSavingToFirestore || _pendingSave) {
-    setSyncStatus("syncing", "🔄 Đang lưu dữ liệu...");
-    // Thử lại sau khi save xong
-    var retryCount = 0;
-    var retry = setInterval(function() {
-      retryCount++;
-      if (!_isSavingToFirestore && !_pendingSave) {
-        clearInterval(retry);
-        if (callback) callback();
-      }
-      if (retryCount > 20) { clearInterval(retry); if (callback) callback(); }
-    }, 200);
-    return;
-  }
+  // Luôn load từ Firestore khi mở app — Firestore là nguồn sự thật duy nhất
   setSyncStatus("syncing", "🔄 Đang tải dữ liệu từ cloud...");
   db.collection(DRUG_COLLECTION).doc(META_DOC).get()
     .then(function(doc) {
       if (doc.exists) {
         var data = doc.data();
-        var cloudTs  = data.updatedAt || 0;
-        var savedBy  = data.savedBy || "";
-        var firestoreTs = parseInt(localStorage.getItem("bvhh_firestore_ts") || "0", 10);
-
-        // Nếu cloud có data mới hơn lần sync cuối của máy này → load
-        // Nếu chính máy này vừa save (savedBy === _machineId) → không cần load lại
-        if (savedBy !== _machineId && cloudTs > firestoreTs) {
-          // Máy khác vừa cập nhật → load về
-          if (data.drugs     && data.drugs.length     > 0) DRUG_DB     = data.drugs;
-          if (data.bacsi     && data.bacsi.length     > 0) BACSI_DB    = data.bacsi;
-          if (data.loidan    && data.loidan.length    > 0) LOIDAN_DB   = data.loidan;
-          if (data.benh      && data.benh.length      > 0) BENH_DB     = data.benh;
-          if (data.templates && data.templates.length > 0) TEMPLATE_DB = data.templates;
-          if (data.addresses && data.addresses.length > 0) ADDR_DB     = data.addresses;
-          if (data.shortcuts) SHORTCUT_DB = data.shortcuts;
-          saveLocalStorage();
-          localStorage.setItem("bvhh_firestore_ts", String(cloudTs));
-          setSyncStatus("ok", "✅ Đã tải dữ liệu từ cloud");
-        } else if (savedBy === _machineId || cloudTs <= firestoreTs) {
-          // Chính máy này vừa save hoặc cloud cũ hơn → giữ data local
-          setSyncStatus("ok", "✅ Dữ liệu đã đồng bộ");
-          // Nếu cloud chưa có gì → đẩy lên
-          if (!data.drugs || !data.drugs.length) saveToFirestore();
-        } else {
-          setSyncStatus("ok", "✅ Dữ liệu đã đồng bộ");
-        }
+        if (data.drugs     && data.drugs.length     > 0) DRUG_DB     = data.drugs;
+        if (data.bacsi     && data.bacsi.length     > 0) BACSI_DB    = data.bacsi;
+        if (data.loidan    && data.loidan.length    > 0) LOIDAN_DB   = data.loidan;
+        if (data.benh      && data.benh.length      > 0) BENH_DB     = data.benh;
+        if (data.templates && data.templates.length > 0) TEMPLATE_DB = data.templates;
+        if (data.addresses && data.addresses.length > 0) ADDR_DB     = data.addresses;
+        if (data.shortcuts) SHORTCUT_DB = data.shortcuts;
+        saveLocalStorage(); // cập nhật localStorage theo Firestore
+        setSyncStatus("ok", "✅ Đã tải dữ liệu từ cloud");
       } else {
+        // Chưa có data trên cloud → đẩy localStorage lên
         setSyncStatus("syncing", "🔄 Khởi tạo dữ liệu lên cloud...");
         saveToFirestore();
       }
       if (callback) callback();
     })
     .catch(function(err) {
+      // Mất mạng → dùng localStorage
       setSyncStatus("offline", "📴 Không kết nối được cloud, dùng dữ liệu cục bộ");
       if (callback) callback();
     });
