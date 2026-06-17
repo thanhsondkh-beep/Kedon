@@ -1308,34 +1308,83 @@ function setSyncStatus(state, msg) {
   else el.style.display = "flex";
 }
 
+function mergeArrays(local, cloud, keyFn) {
+  // Merge 2 mảng: giữ tất cả item từ cả 2, ưu tiên local nếu trùng key
+  if (!cloud || !cloud.length) return local;
+  var result = local.slice();
+  cloud.forEach(function(ci) {
+    var key = keyFn(ci);
+    var inLocal = result.findIndex(function(li){ return keyFn(li) === key; });
+    if (inLocal < 0) result.push(ci); // item chỉ có trên cloud → thêm vào
+  });
+  return result;
+}
+
 function saveToFirestore() {
   if (_isSaving) return;
   _isSaving = true;
   setSyncStatus("syncing", "🔄 Đang đồng bộ...");
-  db.collection(DRUG_COLLECTION).doc(META_DOC).set({
-    drugs:     DRUG_DB,
-    bacsi:     BACSI_DB,
-    loidan:    LOIDAN_DB,
-    benh:      BENH_DB,
-    templates: TEMPLATE_DB,
-    addresses: ADDR_DB,
-    shortcuts: SHORTCUT_DB,
-    updatedAt: Date.now()
-  })
-  .then(function() {
-    _isSaving = false;
-    setSyncStatus("ok", "✅ Đã đồng bộ lên cloud");
-  })
-  .catch(function(err) {
-    _isSaving = false;
-    var msg = err.message;
-    if (err.code === "permission-denied") msg = "Không có quyền ghi — kiểm tra Firestore Rules";
-    setSyncStatus("error", "⚠ Lỗi lưu: " + msg);
-    // Thử lại sau 3 giây nếu lỗi mạng
-    if (err.code !== "permission-denied") {
-      setTimeout(function(){ saveToFirestore(); }, 3000);
-    }
-  });
+
+  // Đọc Firestore trước để merge, tránh ghi đè data của máy khác
+  db.collection(DRUG_COLLECTION).doc(META_DOC).get()
+    .then(function(doc) {
+      var mergedTemplates = TEMPLATE_DB;
+      var mergedBacsi     = BACSI_DB;
+      var mergedLoidan    = LOIDAN_DB;
+      var mergedBenh      = BENH_DB;
+      var mergedAddr      = ADDR_DB;
+      var mergedShortcut  = SHORTCUT_DB;
+
+      if (doc.exists) {
+        var d = doc.data();
+        // Merge từng collection: giữ local (mới hơn) + thêm item chỉ có trên cloud
+        if (d.templates && d.templates.length > 0)
+          mergedTemplates = mergeArrays(TEMPLATE_DB, d.templates, function(t){ return t.name; });
+        if (d.bacsi && d.bacsi.length > 0)
+          mergedBacsi = mergeArrays(BACSI_DB, d.bacsi, function(b){ return b.ten + "|" + b.sdt; });
+        if (d.loidan && d.loidan.length > 0)
+          mergedLoidan = mergeArrays(LOIDAN_DB, d.loidan, function(l){ return l; });
+        if (d.benh && d.benh.length > 0)
+          mergedBenh = mergeArrays(BENH_DB, d.benh, function(b){ return b; });
+        if (d.addresses && d.addresses.length > 0)
+          mergedAddr = mergeArrays(ADDR_DB, d.addresses, function(a){ return a; });
+        if (d.shortcuts && d.shortcuts.length > 0)
+          mergedShortcut = mergeArrays(SHORTCUT_DB, d.shortcuts, function(s){ return s.key; });
+      }
+
+      // Cập nhật lại local với data đã merge
+      TEMPLATE_DB = mergedTemplates;
+      BACSI_DB    = mergedBacsi;
+      LOIDAN_DB   = mergedLoidan;
+      BENH_DB     = mergedBenh;
+      ADDR_DB     = mergedAddr;
+      SHORTCUT_DB = mergedShortcut;
+      saveLocalStorage();
+
+      return db.collection(DRUG_COLLECTION).doc(META_DOC).set({
+        drugs:     DRUG_DB,
+        bacsi:     BACSI_DB,
+        loidan:    LOIDAN_DB,
+        benh:      BENH_DB,
+        templates: TEMPLATE_DB,
+        addresses: ADDR_DB,
+        shortcuts: SHORTCUT_DB,
+        updatedAt: Date.now()
+      });
+    })
+    .then(function() {
+      _isSaving = false;
+      setSyncStatus("ok", "✅ Đã đồng bộ lên cloud");
+    })
+    .catch(function(err) {
+      _isSaving = false;
+      var msg = err.message;
+      if (err.code === "permission-denied") msg = "Không có quyền ghi — kiểm tra Firestore Rules";
+      setSyncStatus("error", "⚠ Lỗi lưu: " + msg);
+      if (err.code !== "permission-denied") {
+        setTimeout(function(){ saveToFirestore(); }, 3000);
+      }
+    });
 }
 
 function loadFromFirestore(callback) {
