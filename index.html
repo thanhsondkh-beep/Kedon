@@ -1388,30 +1388,35 @@ function saveToFirestore() {
 }
 
 function loadFromFirestore(callback) {
-  // Luôn load từ Firestore khi mở app — Firestore là nguồn sự thật duy nhất
   setSyncStatus("syncing", "🔄 Đang tải dữ liệu từ cloud...");
   db.collection(DRUG_COLLECTION).doc(META_DOC).get()
     .then(function(doc) {
       if (doc.exists) {
         var data = doc.data();
-        if (data.drugs     && data.drugs.length     > 0) DRUG_DB     = data.drugs;
-        if (data.bacsi     && data.bacsi.length     > 0) BACSI_DB    = data.bacsi;
-        if (data.loidan    && data.loidan.length    > 0) LOIDAN_DB   = data.loidan;
-        if (data.benh      && data.benh.length      > 0) BENH_DB     = data.benh;
-        if (data.templates && data.templates.length > 0) TEMPLATE_DB = data.templates;
-        if (data.addresses && data.addresses.length > 0) ADDR_DB     = data.addresses;
-        if (data.shortcuts) SHORTCUT_DB = data.shortcuts;
-        saveLocalStorage(); // cập nhật localStorage theo Firestore
+        // DRUG_DB: luôn lấy từ cloud (admin quản lý)
+        if (data.drugs && data.drugs.length > 0) DRUG_DB = data.drugs;
+        // Các collection khác: merge cloud + local để không mất data
+        if (data.bacsi     && data.bacsi.length     > 0)
+          BACSI_DB    = mergeArrays(data.bacsi,     BACSI_DB,    function(b){ return b.ten+"|"+b.sdt; });
+        if (data.loidan    && data.loidan.length    > 0)
+          LOIDAN_DB   = mergeArrays(data.loidan,    LOIDAN_DB,   function(l){ return l; });
+        if (data.benh      && data.benh.length      > 0)
+          BENH_DB     = mergeArrays(data.benh,      BENH_DB,     function(b){ return b; });
+        if (data.templates && data.templates.length > 0)
+          TEMPLATE_DB = mergeArrays(data.templates, TEMPLATE_DB, function(t){ return t.name; });
+        if (data.addresses && data.addresses.length > 0)
+          ADDR_DB     = mergeArrays(data.addresses, ADDR_DB,     function(a){ return a; });
+        if (data.shortcuts && data.shortcuts.length > 0)
+          SHORTCUT_DB = mergeArrays(data.shortcuts, SHORTCUT_DB, function(s){ return s.key; });
+        saveLocalStorage();
         setSyncStatus("ok", "✅ Đã tải dữ liệu từ cloud");
       } else {
-        // Chưa có data trên cloud → đẩy localStorage lên
         setSyncStatus("syncing", "🔄 Khởi tạo dữ liệu lên cloud...");
         saveToFirestore();
       }
       if (callback) callback();
     })
     .catch(function(err) {
-      // Mất mạng → dùng localStorage
       setSyncStatus("offline", "📴 Không kết nối được cloud, dùng dữ liệu cục bộ");
       if (callback) callback();
     });
